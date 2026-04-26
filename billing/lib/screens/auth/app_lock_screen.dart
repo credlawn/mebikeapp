@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pinput/pinput.dart';
@@ -9,7 +10,7 @@ import '../../app_router.dart';
 import '../../pb_service.dart';
 import '../../login_screen.dart';
 
-enum _LockState { waiting, showPin, success }
+enum _LockState { waiting, showPin, cooldown, success }
 
 class AppLockScreen extends StatefulWidget {
   const AppLockScreen({super.key});
@@ -23,12 +24,22 @@ class _AppLockScreenState extends State<AppLockScreen> {
   final _lockService = LockService();
   _LockState _state = _LockState.waiting;
   bool _isAuthRunning = false;
+  int _remainingSeconds = 0;
+  Timer? _cooldownTimer;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startBiometric());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_lockService.isLockedOut) {
+        _startCooldownTimer();
+      } else {
+        _startBiometric();
+      }
+    });
   }
+
+  // ─── Biometric ─────────────────────────────────────────────────────────
 
   Future<void> _startBiometric() async {
     if (_isAuthRunning) return;
@@ -43,11 +54,11 @@ class _AppLockScreenState extends State<AppLockScreen> {
       if (!mounted) return;
 
       if (authenticated) {
+        await _lockService.resetFailedAttempts();
         setState(() => _state = _LockState.success);
         await Future.delayed(const Duration(seconds: 1));
         _unlock();
       } else {
-        // User tapped "Use PIN"
         setState(() => _state = _LockState.showPin);
       }
     } catch (e) {
@@ -57,14 +68,53 @@ class _AppLockScreenState extends State<AppLockScreen> {
     }
   }
 
-  void _handlePinSubmit(String pin) {
+  // ─── PIN ───────────────────────────────────────────────────────────────
+
+  Future<void> _handlePinSubmit(String pin) async {
+    if (_lockService.isLockedOut) {
+      _startCooldownTimer();
+      return;
+    }
+
     if (_lockService.verifyPin(pin)) {
+      await _lockService.resetFailedAttempts();
       _unlock();
     } else {
-      AppSnackBars.showError(context, 'Incorrect PIN');
+      await _lockService.recordFailedAttempt();
       _pinController.clear();
+
+      if (_lockService.isLockedOut) {
+        AppSnackBars.showError(context, 'Too many attempts. Please wait 30 seconds.');
+        _startCooldownTimer();
+      } else {
+        final remaining = LockService.maxFailedAttempts - _lockService.failedAttempts;
+        AppSnackBars.showError(context, 'Incorrect PIN. $remaining attempt(s) left.');
+      }
     }
   }
+
+  // ─── Cooldown ──────────────────────────────────────────────────────────
+
+  void _startCooldownTimer() {
+    setState(() {
+      _state = _LockState.cooldown;
+      _remainingSeconds = _lockService.remainingCooldownSeconds;
+    });
+
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) { timer.cancel(); return; }
+      final remaining = _lockService.remainingCooldownSeconds;
+      if (remaining <= 0) {
+        timer.cancel();
+        setState(() => _state = _LockState.showPin);
+      } else {
+        setState(() => _remainingSeconds = remaining);
+      }
+    });
+  }
+
+  // ─── Navigation ────────────────────────────────────────────────────────
 
   void _unlock() {
     if (!mounted) return;
@@ -86,17 +136,18 @@ class _AppLockScreenState extends State<AppLockScreen> {
 
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     _pinController.dispose();
     super.dispose();
   }
 
+  // ─── Build ─────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        SystemNavigator.pop();
-        return false;
-      },
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (_) => SystemNavigator.pop(),
       child: Scaffold(
         backgroundColor: Colors.white,
         body: _buildBody(),
@@ -107,7 +158,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
   Widget _buildBody() {
     switch (_state) {
       case _LockState.waiting:
-        return const SizedBox.shrink(); // Clean white, popup on top
+        return const SizedBox.shrink();
 
       case _LockState.success:
         return Center(
@@ -124,6 +175,54 @@ class _AppLockScreenState extends State<AppLockScreen> {
                 ),
               ),
             ],
+          ),
+        );
+
+      case _LockState.cooldown:
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.lock_clock_rounded, size: 80, color: Colors.orange),
+                const SizedBox(height: 24),
+                Text('Too Many Attempts', style: AppTypography.h1),
+                const SizedBox(height: 12),
+                Text(
+                  'Please wait $_remainingSeconds seconds before trying again.',
+                  style: AppTypography.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: 80,
+                  height: 80,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CircularProgressIndicator(
+                        value: _remainingSeconds / LockService.cooldownSeconds,
+                        strokeWidth: 6,
+                        color: Colors.orange,
+                        backgroundColor: Colors.orange.shade100,
+                      ),
+                      Center(
+                        child: Text(
+                          '$_remainingSeconds',
+                          style: AppTypography.h1.copyWith(color: Colors.orange),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 64),
+                TextButton(
+                  onPressed: _handleLogout,
+                  child: Text('Logout & Reset', style: TextStyle(color: Colors.red.shade400)),
+                ),
+              ],
+            ),
           ),
         );
 

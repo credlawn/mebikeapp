@@ -20,8 +20,51 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final lockService = LockService();
+    final pbService = PbService();
+
+    if (state == AppLifecycleState.paused) {
+      // App went to background — save timestamp
+      lockService.onAppBackgrounded();
+    } else if (state == AppLifecycleState.resumed) {
+      // App came to foreground
+      if (pbService.isAuthenticated && lockService.isPinSet) {
+        if (lockService.shouldLockOnResume) {
+          // 15 minutes exceeded — lock the app
+          lockService.onAppForegrounded();
+          PbService.navigatorKey.currentState?.pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const AppLockScreen()),
+            (route) => false,
+          );
+        } else {
+          // Within 15 minutes — clear background timestamp, no lock
+          lockService.onAppForegrounded();
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,19 +87,9 @@ class MyApp extends StatelessWidget {
     final bool needsPasswordChange = record?.getBoolValue('force_password_change') ?? false;
     final bool isPinSet = LockService().isPinSet;
 
-    if (!isAuthenticated) {
-      return const LoginScreen();
-    }
-    
-    if (needsPasswordChange) {
-      return const ChangePasswordScreen();
-    }
-
-    if (!isPinSet) {
-      return const SetupPinScreen();
-    }
-
-    // Default authenticated & secured state: Show Lock Screen
+    if (!isAuthenticated) return const LoginScreen();
+    if (needsPasswordChange) return const ChangePasswordScreen();
+    if (!isPinSet) return const SetupPinScreen();
     return const AppLockScreen();
   }
 }
