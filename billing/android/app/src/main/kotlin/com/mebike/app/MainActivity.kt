@@ -1,4 +1,4 @@
-package com.example.billing
+package com.mebike.app
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

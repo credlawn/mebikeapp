@@ -7,6 +7,7 @@ import 'screens/auth/change_password_screen.dart';
 import 'services/lock_service.dart';
 import 'screens/auth/setup_pin_screen.dart';
 import 'screens/auth/app_lock_screen.dart';
+import 'screens/auth/splash_screen.dart';
 import 'app_router.dart';
 
 void main() async {
@@ -77,19 +78,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         scaffoldBackgroundColor: AppColors.background,
         useMaterial3: true,
       ),
-      home: _getInitialScreen(),
+      home: const FlutterSplashScreen(),
     );
-  }
-
-  Widget _getInitialScreen() {
-    final record = PbService().pb.authStore.record;
-    final bool isAuthenticated = PbService().isAuthenticated;
-    final bool needsPasswordChange = record?.getBoolValue('force_password_change') ?? false;
-    final bool isPinSet = LockService().isPinSet;
-
-    if (!isAuthenticated) return const LoginScreen();
-    if (needsPasswordChange) return const ChangePasswordScreen();
-    if (!isPinSet) return const SetupPinScreen();
-    return const AppLockScreen();
   }
 }
