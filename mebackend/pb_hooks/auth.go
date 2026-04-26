@@ -9,8 +9,13 @@ import (
 func RegisterAuthHooks(app *pocketbase.PocketBase) {
 	app.OnRecordAuthRequest("users").BindFunc(func(e *core.RecordAuthRequestEvent) error {
 		if !e.Record.GetBool("enable") {
-			return apis.NewBadRequestError("Your account is disabled. Please contact your manager.", nil)
+			return apis.NewBadRequestError("[FORCED_LOGOUT] Your account is disabled. Please contact your manager.", nil)
 		}
+
+		if e.Record.GetString("role") == "" {
+			return apis.NewBadRequestError("[FORCED_LOGOUT] Your account is not approved. Please contact your manager.", nil)
+		}
+
 		return e.Next()
 	})
 }

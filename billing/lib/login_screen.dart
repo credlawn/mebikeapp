@@ -4,6 +4,11 @@ import 'theme/app_snackbars.dart';
 import 'theme/colors.dart';
 import 'theme/buttons.dart';
 import 'theme/typography.dart';
+import 'screens/dashboard/company_dashboard.dart';
+import 'screens/dashboard/dealer_dashboard.dart';
+import 'screens/dashboard/subdealer_dashboard.dart';
+import 'screens/dashboard/manager_dashboard.dart';
+import 'screens/dashboard/account_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -27,30 +32,53 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _pbService.login(
+      final auth = await _pbService.login(
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
+
+      final role = auth.record.getStringValue('role');
       
       if (mounted) {
-        AppSnackBars.showSuccess(context, 'Welcome back! Login successful.');
-        // Navigate to Home or next screen
+        AppSnackBars.showSuccess(context, 'Welcome back!');
+        _navigateByRole(role);
       }
     } catch (e) {
       if (mounted) {
         String errorMessage = 'Authentication failed. Please check your credentials.';
-        
-        // Extract message from Pocketbase exception if possible
         if (e.toString().contains('message:')) {
-           final msg = e.toString().split('message:').last.split(',').first.trim();
-           if (msg.isNotEmpty) errorMessage = msg.replaceAll('}', '').replaceAll('"', '');
+          final msg = e.toString().split('message:').last.split(',').first.trim();
+          if (msg.isNotEmpty) {
+            errorMessage = msg
+                .replaceAll('}', '')
+                .replaceAll('"', '')
+                .replaceAll('[FORCED_LOGOUT]', '')
+                .trim();
+          }
         }
-
         AppSnackBars.showError(context, errorMessage);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _navigateByRole(String role) {
+    Widget screen;
+    switch (role) {
+      case 'company':   screen = const CompanyDashboard(); break;
+      case 'dealer':    screen = const DealerDashboard(); break;
+      case 'subdealer': screen = const SubDealerDashboard(); break;
+      case 'manager':   screen = const ManagerDashboard(); break;
+      case 'account':   screen = const AccountDashboard(); break;
+      default:
+        AppSnackBars.showError(context, 'Unknown role. Contact support.');
+        return;
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => screen),
+    );
   }
 
   @override
