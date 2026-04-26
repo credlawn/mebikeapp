@@ -11,6 +11,8 @@ import 'screens/dashboard/subdealer_dashboard.dart';
 import 'screens/dashboard/manager_dashboard.dart';
 import 'screens/dashboard/account_dashboard.dart';
 import 'screens/auth/change_password_screen.dart';
+import 'services/lock_service.dart';
+import 'screens/auth/setup_pin_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -69,6 +71,14 @@ class _LoginScreenState extends State<LoginScreen> {
     if (needsPasswordChange) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+      );
+      return;
+    }
+
+    // Check if PIN is already set on this device
+    if (!LockService().isPinSet) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const SetupPinScreen()),
       );
       return;
     }

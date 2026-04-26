@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_provider.dart';
 import 'login_screen.dart';
 import 'theme/app_snackbars.dart';
+import 'services/lock_service.dart';
 
 class PbService {
   static final PbService _instance = PbService._internal();
@@ -107,5 +108,8 @@ class PbService {
     return await pb.collection('users').authWithPassword(email, password);
   }
 
-  void logout() => pb.authStore.clear();
+  void logout() {
+    pb.authStore.clear();
+    LockService().clearPin();
+  }
 }
