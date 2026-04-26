@@ -9,6 +9,7 @@ import 'screens/auth/setup_pin_screen.dart';
 import 'screens/auth/app_lock_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'app_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() async {
   try {
@@ -18,7 +19,7 @@ void main() async {
   } catch (e) {
     if (kDebugMode) print('❌ Initialization Error: $e');
   }
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatefulWidget {

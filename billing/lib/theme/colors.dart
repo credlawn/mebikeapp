@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Primary Palette (Deep Premium Red - Less "Sharp", More Solid)
-  static const Color primary = Color(0xFFB91C1C); // Deep Tech Red
-  static const Color primaryDark = Color(0xFF991B1B);
-  static const Color primaryLight = Color(0xFFFEF2F2);
+  // Primary Palette (Emerald Green - Representing Green Energy & Professionalism)
+  static const Color primary = Color(0xFF059669); // Emerald Green
+  static const Color primaryDark = Color(0xFF065F46);
+  static const Color primaryLight = Color(0xFFECFDF5);
   
   // Status Colors
-  static const Color success = Color(0xFF059669);
+  static const Color success = Color(0xFF10B981);
   static const Color error = Color(0xFFDC2626);
   static const Color warning = Color(0xFFD97706);
   
@@ -22,7 +22,7 @@ class AppColors {
   
   // Gradient Colors
   static const List<Color> primaryGradient = [
-    Color(0xFFB91C1C),
-    Color(0xFF991B1B),
+    Color(0xFF059669),
+    Color(0xFF065F46),
   ];
 }
