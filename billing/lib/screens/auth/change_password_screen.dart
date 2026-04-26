@@ -36,6 +36,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       AppSnackBars.showError(context, 'New passwords do not match');
       return;
     }
+    if (_passwordController.text == _oldPasswordController.text) {
+      AppSnackBars.showError(context, 'New password cannot be same as current');
+      return;
+    }
 
     setState(() => _isLoading = true);
 

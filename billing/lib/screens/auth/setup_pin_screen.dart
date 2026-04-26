@@ -24,18 +24,31 @@ class SetupPinScreen extends StatefulWidget {
 
 class _SetupPinScreenState extends State<SetupPinScreen> {
   final _pinController = TextEditingController();
+  final _pinFocusNode = FocusNode();
   final _lockService = LockService();
+
+  @override
+  void dispose() {
+    _pinController.dispose();
+    _pinFocusNode.dispose();
+    super.dispose();
+  }
 
   void _handlePinSubmit(String pin) async {
     if (!widget.isConfirming) {
-      // Go to confirmation
       Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => SetupPinScreen(isConfirming: true, firstPin: pin),
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => 
+              SetupPinScreen(isConfirming: true, firstPin: pin),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
         ),
-      );
+      ).then((_) {
+        _pinController.clear();
+        _pinFocusNode.requestFocus();
+      }); 
     } else {
-      // Verify confirmation
       if (pin == widget.firstPin) {
         await _lockService.setPin(pin);
         if (mounted) {
@@ -50,7 +63,6 @@ class _SetupPinScreenState extends State<SetupPinScreen> {
 
   void _showBiometricDialog() async {
     final canBio = await _lockService.canCheckBiometrics();
-    
     if (!mounted) return;
 
     if (canBio) {
@@ -58,15 +70,19 @@ class _SetupPinScreenState extends State<SetupPinScreen> {
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
-          title: const Text('Enable Fingerprint?'),
-          content: const Text('Would you like to use fingerprint to unlock the app quickly?'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Enable Biometrics?', style: AppTypography.h3),
+          content: Text(
+            'Would you like to use fingerprint to unlock the app quickly?',
+            style: AppTypography.bodyMedium,
+          ),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 _finishSetup();
               },
-              child: const Text('NO'),
+              child: Text('NO', style: TextStyle(color: AppColors.textSecondary)),
             ),
             TextButton(
               onPressed: () async {
@@ -79,11 +95,11 @@ class _SetupPinScreenState extends State<SetupPinScreen> {
                   }
                 } else {
                   if (mounted) {
-                    AppSnackBars.showError(context, 'Biometric verification failed.');
+                    AppSnackBars.showError(context, 'Verification failed.');
                   }
                 }
               },
-              child: const Text('YES'),
+              child: const Text('YES', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -106,61 +122,93 @@ class _SetupPinScreenState extends State<SetupPinScreen> {
   @override
   Widget build(BuildContext context) {
     final defaultPinTheme = PinTheme(
-      width: 56,
-      height: 56,
+      width: 60,
+      height: 64,
       textStyle: AppTypography.h1.copyWith(color: AppColors.primary),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(12),
-        color: Colors.white,
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.transparent),
       ),
     );
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Setup App Lock'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
-      body: Center(
+      backgroundColor: Colors.white,
+      body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(32.0),
+          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 64.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.lock_outline_rounded, size: 80, color: AppColors.primary),
+              // Header Icon
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.shield_outlined,
+                  size: 32,
+                  color: AppColors.primary,
+                ),
+              ),
               const SizedBox(height: 32),
+              
               Text(
-                widget.isConfirming ? 'Confirm your PIN' : 'Create a 4-digit PIN',
+                widget.isConfirming ? 'Confirm PIN' : 'Create App PIN',
                 style: AppTypography.h1,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Text(
-                'This PIN will be used to unlock your app.',
+                widget.isConfirming 
+                    ? 'Verify your new 4-digit PIN to secure your account.'
+                    : 'Set a 4-digit security PIN to protect your billing data.',
                 style: AppTypography.bodyMedium,
-                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 48),
-              Pinput(
-                length: 4,
-                controller: _pinController,
-                defaultPinTheme: defaultPinTheme,
-                focusedPinTheme: defaultPinTheme.copyWith(
-                  decoration: defaultPinTheme.decoration!.copyWith(
-                    border: Border.all(color: AppColors.primary, width: 2),
+              
+              const Spacer(),
+              
+              Center(
+                child: Pinput(
+                  length: 4,
+                  controller: _pinController,
+                  focusNode: _pinFocusNode,
+                  defaultPinTheme: defaultPinTheme,
+                  focusedPinTheme: defaultPinTheme.copyWith(
+                    decoration: defaultPinTheme.decoration!.copyWith(
+                      border: Border.all(color: AppColors.primary, width: 1.5),
+                    ),
+                  ),
+                  onCompleted: _handlePinSubmit,
+                  autofocus: true,
+                  obscureText: true,
+                ),
+              ),
+              
+              const Spacer(flex: 2),
+              
+              if (widget.isConfirming)
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      'Reset pin again',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
                   ),
                 ),
-                onCompleted: _handlePinSubmit,
-                autofocus: true,
-                obscureText: true,
-              ),
-              const SizedBox(height: 48),
-              if (widget.isConfirming)
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Go Back'),
+              
+              const SizedBox(height: 24),
+              Center(
+                child: Text(
+                  '© 2026 | Manns Tbi Limited',
+                  style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
                 ),
+              ),
             ],
           ),
         ),

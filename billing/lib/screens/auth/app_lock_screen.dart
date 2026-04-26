@@ -21,6 +21,7 @@ class AppLockScreen extends StatefulWidget {
 
 class _AppLockScreenState extends State<AppLockScreen> {
   final _pinController = TextEditingController();
+  final _pinFocusNode = FocusNode();
   final _lockService = LockService();
   _LockState _state = _LockState.waiting;
   bool _isAuthRunning = false;
@@ -82,9 +83,10 @@ class _AppLockScreenState extends State<AppLockScreen> {
     } else {
       await _lockService.recordFailedAttempt();
       _pinController.clear();
+      _pinFocusNode.requestFocus();
 
       if (_lockService.isLockedOut) {
-        AppSnackBars.showError(context, 'Too many attempts. Please wait 30 seconds.');
+        AppSnackBars.showError(context, 'Too many attempts. Cooldown active.');
         _startCooldownTimer();
       } else {
         final remaining = LockService.maxFailedAttempts - _lockService.failedAttempts;
@@ -107,7 +109,10 @@ class _AppLockScreenState extends State<AppLockScreen> {
       final remaining = _lockService.remainingCooldownSeconds;
       if (remaining <= 0) {
         timer.cancel();
-        setState(() => _state = _LockState.showPin);
+        setState(() {
+          _state = _LockState.showPin;
+          WidgetsBinding.instance.addPostFrameCallback((_) => _pinFocusNode.requestFocus());
+        });
       } else {
         setState(() => _remainingSeconds = remaining);
       }
@@ -129,7 +134,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
     PbService().logout();
     _lockService.clearPin();
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => LoginScreen()),
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
     );
   }
@@ -138,6 +143,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
   void dispose() {
     _cooldownTimer?.cancel();
     _pinController.dispose();
+    _pinFocusNode.dispose();
     super.dispose();
   }
 
@@ -165,14 +171,18 @@ class _AppLockScreenState extends State<AppLockScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.check_circle_outline_rounded, size: 80, color: Colors.green),
-              const SizedBox(height: 16),
-              Text(
-                'Successfully Authenticated',
-                style: AppTypography.bodyMedium.copyWith(
-                  color: Colors.green,
-                  fontWeight: FontWeight.bold,
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFECFDF5),
+                  shape: BoxShape.circle,
                 ),
+                child: const Icon(Icons.check_circle_rounded, size: 64, color: AppColors.success),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Authenticated',
+                style: AppTypography.h2.copyWith(color: AppColors.success),
               ),
             ],
           ),
@@ -185,32 +195,39 @@ class _AppLockScreenState extends State<AppLockScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.lock_clock_rounded, size: 80, color: Colors.orange),
-                const SizedBox(height: 24),
-                Text('Too Many Attempts', style: AppTypography.h1),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.lock_clock_rounded, size: 48, color: AppColors.primary),
+                ),
+                const SizedBox(height: 32),
+                Text('Temporary Lockout', style: AppTypography.h1),
                 const SizedBox(height: 12),
                 Text(
-                  'Please wait $_remainingSeconds seconds before trying again.',
+                  'Too many failed attempts.\nPlease try again in a few moments.',
                   style: AppTypography.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 48),
                 SizedBox(
-                  width: 80,
-                  height: 80,
+                  width: 100,
+                  height: 100,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
                       CircularProgressIndicator(
                         value: _remainingSeconds / LockService.cooldownSeconds,
-                        strokeWidth: 6,
-                        color: Colors.orange,
-                        backgroundColor: Colors.orange.shade100,
+                        strokeWidth: 4,
+                        color: AppColors.primary,
+                        backgroundColor: AppColors.primaryLight,
                       ),
                       Center(
                         child: Text(
                           '$_remainingSeconds',
-                          style: AppTypography.h1.copyWith(color: Colors.orange),
+                          style: AppTypography.h1.copyWith(color: AppColors.primary),
                         ),
                       ),
                     ],
@@ -219,7 +236,13 @@ class _AppLockScreenState extends State<AppLockScreen> {
                 const SizedBox(height: 64),
                 TextButton(
                   onPressed: _handleLogout,
-                  child: Text('Logout & Reset', style: TextStyle(color: Colors.red.shade400)),
+                  child: Text(
+                    'Logout & Reset',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -227,6 +250,16 @@ class _AppLockScreenState extends State<AppLockScreen> {
         );
 
       case _LockState.showPin:
+        final defaultPinTheme = PinTheme(
+          width: 56,
+          height: 60,
+          textStyle: AppTypography.h1.copyWith(color: AppColors.primary),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        );
+
         return SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -234,43 +267,53 @@ class _AppLockScreenState extends State<AppLockScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.security_rounded, size: 80, color: AppColors.primary),
-                  const SizedBox(height: 32),
-                  Text('Enter App PIN', style: AppTypography.h1),
-                  const SizedBox(height: 12),
-                  Text('Verify your identity to continue', style: AppTypography.bodyMedium),
+                  Image.asset('assets/mebike_logo_final.png', height: 80),
                   const SizedBox(height: 48),
+                  Text('Enter App PIN', style: AppTypography.h2),
+                  const SizedBox(height: 8),
+                  Text('Secure Access Required', style: AppTypography.bodySmall),
+                  const SizedBox(height: 40),
                   Pinput(
                     length: 4,
                     controller: _pinController,
-                    defaultPinTheme: PinTheme(
-                      width: 56,
-                      height: 56,
-                      textStyle: AppTypography.h1.copyWith(color: AppColors.primary),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.white,
+                    focusNode: _pinFocusNode,
+                    defaultPinTheme: defaultPinTheme,
+                    focusedPinTheme: defaultPinTheme.copyWith(
+                      decoration: defaultPinTheme.decoration!.copyWith(
+                        border: Border.all(color: AppColors.primary, width: 1.5),
                       ),
                     ),
                     onCompleted: _handlePinSubmit,
                     autofocus: true,
                     obscureText: true,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 40),
                   if (_lockService.isBiometricEnabled)
-                    TextButton(
+                    TextButton.icon(
                       onPressed: () {
                         _pinController.clear();
                         setState(() => _state = _LockState.waiting);
                         _startBiometric();
                       },
-                      child: const Text('Use Fingerprint Instead'),
+                      icon: const Icon(Icons.fingerprint_rounded, size: 20),
+                      label: const Text('Use Biometrics'),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.primary),
                     ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 64),
                   TextButton(
                     onPressed: _handleLogout,
-                    child: Text('Logout & Reset', style: TextStyle(color: Colors.red.shade400)),
+                    child: Text(
+                      'Logout & Reset Account',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    '© 2026 | Manns Tbi Limited',
+                    style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
                   ),
                 ],
               ),
