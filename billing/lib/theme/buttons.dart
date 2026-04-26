@@ -8,7 +8,7 @@ class AppButtons {
     required VoidCallback? onPressed,
     bool isLoading = false,
     double? width,
-    double height = 56,
+    double height = 50, // More compact
   }) {
     return SizedBox(
       width: width ?? double.infinity,
@@ -18,19 +18,19 @@ class AppButtons {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
-          elevation: 2,
+          elevation: 0, // Flat design for professional look
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
-          disabledBackgroundColor: AppColors.primary.withOpacity(0.6),
+          disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
         ),
         child: isLoading
             ? const SizedBox(
-                height: 24,
-                width: 24,
+                height: 20,
+                width: 20,
                 child: CircularProgressIndicator(
                   color: Colors.white,
-                  strokeWidth: 3,
+                  strokeWidth: 2,
                 ),
               )
             : Text(
@@ -45,7 +45,7 @@ class AppButtons {
     required String text,
     required VoidCallback onPressed,
     double? width,
-    double height = 56,
+    double height = 50,
   }) {
     return SizedBox(
       width: width ?? double.infinity,
@@ -54,9 +54,9 @@ class AppButtons {
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
-          side: const BorderSide(color: AppColors.primary, width: 2),
+          side: const BorderSide(color: AppColors.primary, width: 1.5),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
         ),
         child: Text(

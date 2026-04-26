@@ -42,20 +42,16 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (mounted) {
-        AppSnackBars.showSuccess(context, 'Welcome back!');
+        AppSnackBars.showSuccess(context, 'Authentication Successful');
         _navigateByRole(auth.record);
       }
     } catch (e) {
       if (mounted) {
-        String errorMessage = 'Authentication failed. Please check your credentials.';
+        String errorMessage = 'Invalid credentials. Please try again.';
         if (e.toString().contains('message:')) {
           final msg = e.toString().split('message:').last.split(',').first.trim();
           if (msg.isNotEmpty) {
-            errorMessage = msg
-                .replaceAll('}', '')
-                .replaceAll('"', '')
-                .replaceAll('[FORCED_LOGOUT]', '')
-                .trim();
+            errorMessage = msg.replaceAll('}', '').replaceAll('"', '').trim();
           }
         }
         AppSnackBars.showError(context, errorMessage);
@@ -75,7 +71,6 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Check if PIN is already set on this device
     if (!LockService().isPinSet) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const SetupPinScreen()),
@@ -92,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
       case 'manager':   screen = const ManagerDashboard(); break;
       case 'account':   screen = const AccountDashboard(); break;
       default:
-        AppSnackBars.showError(context, 'Unknown role. Contact support.');
+        AppSnackBars.showError(context, 'Unauthorized role.');
         return;
     }
 
@@ -104,99 +99,103 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: AppColors.primaryGradient,
-          ),
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Card(
-              elevation: 12,
-              shadowColor: Colors.black26,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
+      backgroundColor: Colors.white,
+      body: Row(
+        children: [
+          // Left Side - Decorative (Optional for wide screens, but keeps it clean on mobile)
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 64.0),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
                 child: Form(
                   key: _formKey,
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.lock_person_rounded,
-                        size: 80,
-                        color: AppColors.primary,
+                      // Logo
+                      Center(
+                        child: Image.asset(
+                          'assets/mebike_logo_final.png',
+                          height: 120,
+                        ),
                       ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Welcome Back',
-                        style: AppTypography.h1,
-                      ),
+                      const SizedBox(height: 48),
+                      
+                      // Welcome Text
+                      Text('Account Login', style: AppTypography.h1),
                       const SizedBox(height: 8),
                       Text(
-                        'Login to your account',
+                        'Enter your credentials to access the billing portal',
                         style: AppTypography.bodyMedium,
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 40),
+
+                      // Email Field
+                      Text('Email Address', style: AppTypography.h3),
+                      const SizedBox(height: 8),
                       TextFormField(
                         controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: const Icon(Icons.email_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey.shade50,
+                        style: AppTypography.input,
+                        decoration: _buildInputDecoration(
+                          hint: 'name@company.com',
+                          icon: Icons.alternate_email_rounded,
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your email';
-                          }
-                          return null;
-                        },
+                        validator: (v) => v!.isEmpty ? 'Email is required' : null,
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
+
+                      // Password Field
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Password', style: AppTypography.h3),
+                          TextButton(
+                            onPressed: () {}, // Forgot password placeholder
+                            child: Text(
+                              'Forgot?',
+                              style: AppTypography.bodySmall.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline),
+                        style: AppTypography.input,
+                        decoration: _buildInputDecoration(
+                          hint: '••••••••',
+                          icon: Icons.lock_outline_rounded,
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                              _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              size: 20,
+                              color: AppColors.textMuted,
                             ),
-                            onPressed: () {
-                              setState(() => _obscurePassword = !_obscurePassword);
-                            },
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                           ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey.shade50,
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your password';
-                          }
-                          return null;
-                        },
+                        validator: (v) => v!.isEmpty ? 'Password is required' : null,
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 40),
+
+                      // Login Button
                       AppButtons.primary(
-                        text: 'LOGIN',
+                        text: 'Sign In',
                         onPressed: _handleLogin,
                         isLoading: _isLoading,
+                      ),
+                      
+                      const SizedBox(height: 32),
+                      Center(
+                        child: Text(
+                          '© 2026 | Manns Tbi Limited',
+                          style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                        ),
                       ),
                     ],
                   ),
@@ -204,7 +203,35 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration({required String hint, required IconData icon, Widget? suffixIcon}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted),
+      prefixIcon: Icon(icon, size: 20, color: AppColors.textSecondary),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: AppColors.background,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppColors.error, width: 1),
       ),
     );
   }
