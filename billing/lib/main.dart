@@ -8,6 +8,7 @@ import 'screens/dashboard/dealer_dashboard.dart';
 import 'screens/dashboard/subdealer_dashboard.dart';
 import 'screens/dashboard/manager_dashboard.dart';
 import 'screens/dashboard/account_dashboard.dart';
+import 'screens/auth/change_password_screen.dart';
 
 void main() async {
   try {
@@ -24,6 +25,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final record = PbService().pb.authStore.record;
+    final bool needsPasswordChange = record?.getBoolValue('force_password_change') ?? false;
+
     return MaterialApp(
       title: 'ME BIKE Billing',
       navigatorKey: PbService.navigatorKey,
@@ -34,7 +38,9 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: PbService().isAuthenticated 
-          ? _getDashboard(PbService().pb.authStore.record?.getStringValue('role') ?? '')
+          ? (needsPasswordChange 
+              ? const ChangePasswordScreen() 
+              : _getDashboard(record?.getStringValue('role') ?? ''))
           : const LoginScreen(),
     );
   }

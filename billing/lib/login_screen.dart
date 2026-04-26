@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pocketbase/pocketbase.dart';
 import 'pb_service.dart';
 import 'theme/app_snackbars.dart';
 import 'theme/colors.dart';
@@ -9,6 +10,7 @@ import 'screens/dashboard/dealer_dashboard.dart';
 import 'screens/dashboard/subdealer_dashboard.dart';
 import 'screens/dashboard/manager_dashboard.dart';
 import 'screens/dashboard/account_dashboard.dart';
+import 'screens/auth/change_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -37,11 +39,9 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text.trim(),
       );
 
-      final role = auth.record.getStringValue('role');
-      
       if (mounted) {
         AppSnackBars.showSuccess(context, 'Welcome back!');
-        _navigateByRole(role);
+        _navigateByRole(auth.record);
       }
     } catch (e) {
       if (mounted) {
@@ -63,7 +63,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _navigateByRole(String role) {
+  void _navigateByRole(RecordModel record) {
+    final bool needsPasswordChange = record.getBoolValue('force_password_change');
+    
+    if (needsPasswordChange) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+      );
+      return;
+    }
+
+    final String role = record.getStringValue('role');
     Widget screen;
     switch (role) {
       case 'company':   screen = const CompanyDashboard(); break;

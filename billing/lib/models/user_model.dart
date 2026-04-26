@@ -5,12 +5,14 @@ class UserModel {
   final String email;
   final String role;
   final bool isEnabled;
+  final bool forcePasswordChange;
 
   const UserModel({
     required this.id,
     required this.email,
     required this.role,
     required this.isEnabled,
+    required this.forcePasswordChange,
   });
 
   static UserModel fromRecord(RecordModel record) {
@@ -19,6 +21,7 @@ class UserModel {
       email: record.getStringValue('email'),
       role: record.getStringValue('role'),
       isEnabled: record.getBoolValue('enable'),
+      forcePasswordChange: record.getBoolValue('force_password_change'),
     );
   }
 }

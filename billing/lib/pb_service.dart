@@ -96,7 +96,7 @@ class PbService {
     }
 
     navigatorKey.currentState?.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => LoginScreen()),
       (route) => false,
     );
   }
