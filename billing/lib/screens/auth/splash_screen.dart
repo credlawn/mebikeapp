@@ -1,73 +1,55 @@
 import 'package:flutter/material.dart';
-import '../../theme/colors.dart';
-import 'app_lock_screen.dart';
-import 'setup_pin_screen.dart';
-import 'change_password_screen.dart';
-import '../../login_screen.dart';
-import '../../pb_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/lock_service.dart';
+import '../../pb_service.dart';
+import '../../login_screen.dart';
+import '../../services/preloader_service.dart';
+import 'app_lock_screen.dart';
 
-class FlutterSplashScreen extends StatefulWidget {
-  const FlutterSplashScreen({super.key});
+class SplashScreen extends ConsumerStatefulWidget {
+  const SplashScreen({super.key});
 
   @override
-  State<FlutterSplashScreen> createState() => _FlutterSplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _FlutterSplashScreenState extends State<FlutterSplashScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
-
-    _controller.forward();
-    _navigateToNext();
+    _initializeApp();
   }
 
-  void _navigateToNext() async {
-    // Show GIF for at least 3 seconds
-    await Future.delayed(const Duration(seconds: 3));
-    
+  Future<void> _initializeApp() async {
+    final lockService = LockService();
+    final pbService = PbService();
+
+    // 1. Minimum delay for the animation to look good
+    final animationDelay = Future.delayed(const Duration(seconds: 3));
+
+    // 2. Pre-fetch all data in the background
+    // This happens while the GIF is playing
+    final dataFetching = PreloaderService.preloadAppData(ref);
+
+    // 3. Check Auth Status
+    final bool isLoggedIn = pbService.pb.authStore.isValid;
+
+    // 4. Wait for both animation and critical data fetching to complete
+    await Future.wait([animationDelay, dataFetching]);
+
     if (!mounted) return;
 
-    final record = PbService().pb.authStore.record;
-    final bool isAuthenticated = PbService().isAuthenticated;
-    final bool needsPasswordChange = record?.getBoolValue('force_password_change') ?? false;
-    final bool isPinSet = LockService().isPinSet;
-
-    Widget nextScreen;
-    if (!isAuthenticated) {
-      nextScreen = const LoginScreen();
-    } else if (needsPasswordChange) {
-      nextScreen = const ChangePasswordScreen();
-    } else if (!isPinSet) {
-      nextScreen = const SetupPinScreen();
+    if (isLoggedIn) {
+      // If logged in, go to Lock Screen
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const AppLockScreen()),
+      );
     } else {
-      nextScreen = const AppLockScreen();
+      // Otherwise go to Login
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
     }
-
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 800),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
   }
 
   @override
@@ -75,18 +57,15 @@ class _FlutterSplashScreenState extends State<FlutterSplashScreen> with SingleTi
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Image.asset(
-                'assets/mebike.gif',
-                width: MediaQuery.of(context).size.width * 0.8,
-                fit: BoxFit.contain,
-              ),
-            ],
-          ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/mebike.gif',
+              width: 300,
+              height: 300,
+            ),
+          ],
         ),
       ),
     );

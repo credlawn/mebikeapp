@@ -9,6 +9,8 @@ import 'screens/auth/setup_pin_screen.dart';
 import 'screens/auth/app_lock_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'app_router.dart';
+import 'screens/partner/partner_list_screen.dart';
+import 'screens/partner/add_partner_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() async {
@@ -96,7 +98,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           ),
         ),
       ),
-      home: const FlutterSplashScreen(),
+      home: const SplashScreen(),
+      routes: {
+        '/partner-list': (context) => const PartnerListScreen(),
+        '/add-partner': (context) => const AddPartnerScreen(),
+      },
     );
   }
 }

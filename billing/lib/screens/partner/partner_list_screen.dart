@@ -5,10 +5,23 @@ import '../../models/partner_model.dart';
 import '../../providers/partner_provider.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
+import '../../theme/app_snackbars.dart';
 import 'add_partner_screen.dart';
 
 class PartnerListScreen extends ConsumerWidget {
   const PartnerListScreen({super.key});
+
+  Future<void> _handleRefresh(WidgetRef ref, BuildContext context) async {
+    try {
+      await ref.refresh(allPartnersProvider.future).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw 'Sync timeout. Check your connection.',
+      );
+      if (context.mounted) AppSnackBars.showSuccess(context, 'Partners list updated');
+    } catch (e) {
+      if (context.mounted) AppSnackBars.showError(context, e.toString());
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -22,6 +35,18 @@ class PartnerListScreen extends ConsumerWidget {
         backgroundColor: AppColors.background,
         appBar: AppBar(
           title: const Text('Our Partners'),
+          actions: [
+            IconButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AddPartnerScreen()),
+                );
+              },
+              icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
+              tooltip: 'Add Partner',
+            ),
+            const SizedBox(width: 8),
+          ],
           bottom: TabBar(
             indicatorColor: AppColors.primary,
             labelColor: AppColors.primary,
@@ -36,21 +61,29 @@ class PartnerListScreen extends ConsumerWidget {
         body: partnersAsync.when(
           data: (_) => TabBarView(
             children: [
-              _PartnerList(partners: activePartners, isActive: true),
-              _PartnerList(partners: inactivePartners, isActive: false),
+              _PartnerList(
+                partners: activePartners, 
+                isActive: true, 
+                onRefresh: () => _handleRefresh(ref, context),
+              ),
+              _PartnerList(
+                partners: inactivePartners, 
+                isActive: false, 
+                onRefresh: () => _handleRefresh(ref, context),
+              ),
             ],
           ),
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => Center(child: Text('Error: $err')),
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AddPartnerScreen()),
-            );
-          },
-          backgroundColor: AppColors.primary,
-          child: const Icon(Icons.add_rounded, color: Colors.white),
+          error: (err, _) => RefreshIndicator(
+            onRefresh: () => _handleRefresh(ref, context),
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.7,
+                child: Center(child: Text('Error: $err\nPull to retry')),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -60,39 +93,56 @@ class PartnerListScreen extends ConsumerWidget {
 class _PartnerList extends StatelessWidget {
   final List<Partner> partners;
   final bool isActive;
+  final RefreshCallback onRefresh;
 
-  const _PartnerList({required this.partners, required this.isActive});
+  const _PartnerList({
+    required this.partners, 
+    required this.isActive, 
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (partners.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isActive ? Icons.people_outline_rounded : Icons.person_off_outlined,
-              size: 64,
-              color: AppColors.textMuted,
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      color: AppColors.primary,
+      backgroundColor: Colors.white,
+      child: partners.isEmpty
+          ? SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.7,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isActive ? Icons.people_outline_rounded : Icons.person_off_outlined,
+                        size: 64,
+                        color: AppColors.textMuted,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No ${isActive ? 'active' : 'inactive'} partners found.',
+                        style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted),
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Pull to refresh', style: AppTypography.bodySmall),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(16),
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: partners.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final partner = partners[index];
+                return _PartnerTile(partner: partner);
+              },
             ),
-            const SizedBox(height: 16),
-            Text(
-              'No ${isActive ? 'active' : 'inactive'} partners found.',
-              style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: partners.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final partner = partners[index];
-        return _PartnerTile(partner: partner);
-      },
     );
   }
 }
@@ -133,7 +183,7 @@ class _PartnerTile extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      partner.partnerName.substring(0, 1).toUpperCase(),
+                      partner.partnerName.isNotEmpty ? partner.partnerName.substring(0, 1).toUpperCase() : 'P',
                       style: AppTypography.h3.copyWith(color: AppColors.primary),
                     ),
                   ),

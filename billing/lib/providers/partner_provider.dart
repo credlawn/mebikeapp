@@ -43,7 +43,9 @@ class PartnerRepository {
 final partnerRepositoryProvider = Provider((ref) => PartnerRepository());
 
 // FutureProvider for the raw partner list
+// Using ref.keepAlive() to ensure data stays in RAM once fetched
 final allPartnersProvider = FutureProvider<List<Partner>>((ref) async {
+  ref.keepAlive(); // Keeps the data in memory even if not watched
   final repo = ref.watch(partnerRepositoryProvider);
   return repo.getAllPartners();
 });
