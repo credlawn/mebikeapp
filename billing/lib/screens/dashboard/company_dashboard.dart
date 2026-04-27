@@ -58,11 +58,10 @@ class _CompanyDashboardState extends ConsumerState<CompanyDashboard> with Single
     final partnersAsync = ref.watch(allPartnersProvider);
     final connectivityAsync = ref.watch(connectivityProvider);
     
-    final activeCount = partnersAsync.when(
-      data: (list) => list.where((p) => p.partnerActive).length,
-      loading: () => 0,
-      error: (_, __) => 0,
-    );
+    final activePartners = ref.watch(activePartnersProvider);
+    final inactivePartners = ref.watch(inactivePartnersProvider);
+    final totalRegisteredCount = activePartners.length + inactivePartners.length;
+    final activeCount = activePartners.length;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -106,7 +105,7 @@ class _CompanyDashboardState extends ConsumerState<CompanyDashboard> with Single
                   ModuleCard(
                     title: 'Partners',
                     subtitle: partnersAsync.when(
-                      data: (list) => '${list.length} Total Registered',
+                      data: (_) => '$totalRegisteredCount Total Registered',
                       loading: () => 'Syncing partners...',
                       error: (_, __) => 'Offline mode',
                     ),

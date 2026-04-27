@@ -27,10 +27,11 @@ class PartnerListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final activePartners = ref.watch(activePartnersProvider);
     final inactivePartners = ref.watch(inactivePartnersProvider);
+    final draftPartners = ref.watch(draftPartnersProvider);
     final partnersAsync = ref.watch(allPartnersProvider);
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -48,6 +49,7 @@ class PartnerListScreen extends ConsumerWidget {
             const SizedBox(width: 8),
           ],
           bottom: TabBar(
+            isScrollable: true,
             indicatorColor: AppColors.primary,
             labelColor: AppColors.primary,
             unselectedLabelColor: AppColors.textSecondary,
@@ -55,32 +57,44 @@ class PartnerListScreen extends ConsumerWidget {
             tabs: [
               Tab(text: 'Active (${activePartners.length})'),
               Tab(text: 'Inactive (${inactivePartners.length})'),
+              Tab(text: 'Drafts (${draftPartners.length})'),
             ],
           ),
         ),
-        body: partnersAsync.when(
-          data: (_) => TabBarView(
-            children: [
-              _PartnerList(
-                partners: activePartners, 
-                isActive: true, 
-                onRefresh: () => _handleRefresh(ref, context),
-              ),
-              _PartnerList(
-                partners: inactivePartners, 
-                isActive: false, 
-                onRefresh: () => _handleRefresh(ref, context),
-              ),
-            ],
-          ),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => RefreshIndicator(
-            onRefresh: () => _handleRefresh(ref, context),
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height * 0.7,
-                child: Center(child: Text('Error: $err\nPull to retry')),
+        body: RefreshIndicator(
+          onRefresh: () => _handleRefresh(ref, context),
+          color: AppColors.primary,
+          backgroundColor: Colors.white,
+          child: partnersAsync.when(
+            data: (_) => TabBarView(
+              children: [
+                _PartnerList(
+                  partners: activePartners, 
+                  isActive: true, 
+                  onRefresh: () => _handleRefresh(ref, context),
+                ),
+                _PartnerList(
+                  partners: inactivePartners, 
+                  isActive: false, 
+                  onRefresh: () => _handleRefresh(ref, context),
+                ),
+                _PartnerList(
+                  partners: draftPartners, 
+                  isActive: false, 
+                  isDraft: true,
+                  onRefresh: () => _handleRefresh(ref, context),
+                ),
+              ],
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, _) => RefreshIndicator(
+              onRefresh: () => _handleRefresh(ref, context),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: Center(child: Text('Error: $err\nPull to retry')),
+                ),
               ),
             ),
           ),
@@ -93,11 +107,13 @@ class PartnerListScreen extends ConsumerWidget {
 class _PartnerList extends StatelessWidget {
   final List<Partner> partners;
   final bool isActive;
+  final bool isDraft;
   final RefreshCallback onRefresh;
 
   const _PartnerList({
     required this.partners, 
     required this.isActive, 
+    this.isDraft = false,
     required this.onRefresh,
   });
 
@@ -117,13 +133,13 @@ class _PartnerList extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        isActive ? Icons.people_outline_rounded : Icons.person_off_outlined,
+                        isDraft ? Icons.edit_note_rounded : (isActive ? Icons.people_outline_rounded : Icons.person_off_outlined),
                         size: 64,
                         color: AppColors.textMuted,
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No ${isActive ? 'active' : 'inactive'} partners found.',
+                        'No ${isDraft ? 'draft' : (isActive ? 'active' : 'inactive')} partners found.',
                         style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted),
                       ),
                       const SizedBox(height: 8),
@@ -140,7 +156,7 @@ class _PartnerList extends StatelessWidget {
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final partner = partners[index];
-                return _PartnerTile(partner: partner);
+                return _PartnerTile(partner: partner, isDraft: isDraft);
               },
             ),
     );
@@ -149,8 +165,9 @@ class _PartnerList extends StatelessWidget {
 
 class _PartnerTile extends StatelessWidget {
   final Partner partner;
+  final bool isDraft;
 
-  const _PartnerTile({required this.partner});
+  const _PartnerTile({required this.partner, this.isDraft = false});
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +183,9 @@ class _PartnerTile extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            // Future: Partner Details Screen
+            if (isDraft) {
+              // Future: Resume Onboarding directly
+            }
           },
           borderRadius: BorderRadius.circular(12),
           child: Padding(
@@ -178,13 +197,13 @@ class _PartnerTile extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
+                    color: isDraft ? Colors.orange.shade50 : AppColors.primaryLight,
                     shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: Text(
                       partner.partnerName.isNotEmpty ? partner.partnerName.substring(0, 1).toUpperCase() : 'P',
-                      style: AppTypography.h3.copyWith(color: AppColors.primary),
+                      style: AppTypography.h3.copyWith(color: isDraft ? Colors.orange : AppColors.primary),
                     ),
                   ),
                 ),
@@ -205,13 +224,20 @@ class _PartnerTile extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          Text(
-                            '#${partner.partnerCode}',
-                            style: AppTypography.bodySmall.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
+                          if (!isDraft)
+                            Text(
+                              '#${partner.partnerCode}',
+                              style: AppTypography.bodySmall.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: Colors.orange.shade100, borderRadius: BorderRadius.circular(4)),
+                              child: const Text('DRAFT', style: TextStyle(color: Colors.orange, fontSize: 9, fontWeight: FontWeight.bold)),
                             ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 4),

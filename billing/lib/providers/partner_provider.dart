@@ -23,6 +23,7 @@ class PartnerRepository {
         page: 1,
         perPage: 1,
         sort: '-partner_code',
+        filter: 'partner_code != ""',
       );
 
       if (records.items.isEmpty) return 'PA001';
@@ -43,21 +44,26 @@ class PartnerRepository {
 final partnerRepositoryProvider = Provider((ref) => PartnerRepository());
 
 // FutureProvider for the raw partner list
-// Using ref.keepAlive() to ensure data stays in RAM once fetched
 final allPartnersProvider = FutureProvider<List<Partner>>((ref) async {
-  ref.keepAlive(); // Keeps the data in memory even if not watched
+  ref.keepAlive();
   final repo = ref.watch(partnerRepositoryProvider);
   return repo.getAllPartners();
 });
 
-// Selector for Active Partners
+// Selector for Active Partners (Code exists + Active true)
 final activePartnersProvider = Provider<List<Partner>>((ref) {
   final all = ref.watch(allPartnersProvider).value ?? [];
-  return all.where((p) => p.partnerActive).toList();
+  return all.where((p) => p.partnerActive && p.partnerCode.isNotEmpty).toList();
 });
 
-// Selector for Inactive Partners
+// Selector for Inactive Partners (Code exists + Active false)
 final inactivePartnersProvider = Provider<List<Partner>>((ref) {
   final all = ref.watch(allPartnersProvider).value ?? [];
-  return all.where((p) => !p.partnerActive).toList();
+  return all.where((p) => !p.partnerActive && p.partnerCode.isNotEmpty).toList();
+});
+
+// Selector for Draft Partners (No Partner Code)
+final draftPartnersProvider = Provider<List<Partner>>((ref) {
+  final all = ref.watch(allPartnersProvider).value ?? [];
+  return all.where((p) => p.partnerCode.isEmpty).toList();
 });
