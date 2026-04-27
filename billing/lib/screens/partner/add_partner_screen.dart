@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:pocketbase/pocketbase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/partner_provider.dart';
 import '../../pb_service.dart';
 import '../../theme/app_snackbars.dart';
 import '../../theme/colors.dart';
+import '../../theme/buttons.dart';
 import '../../theme/typography.dart';
 import '../../theme/pickers.dart';
+import '../../services/date_utils.dart';
+import '../../services/draft_manager.dart';
+
+enum SyncStatus { idle, syncing, synced, error }
 
 class AddPartnerScreen extends ConsumerStatefulWidget {
   const AddPartnerScreen({super.key});
@@ -19,7 +25,8 @@ class AddPartnerScreen extends ConsumerStatefulWidget {
 class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   final _formKey = GlobalKey<FormState>();
   int _currentStep = 0;
-  bool _isLoading = false;
+  bool _isLoading = false; // For blocking actions like FINISH
+  SyncStatus _syncStatus = SyncStatus.idle;
   String? _draftId;
 
   // Controllers
@@ -58,63 +65,73 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   }
 
   Future<void> _checkAndResumeDraft() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedId = prefs.getString('pending_partner_onboarding_id');
-    if (savedId != null) {
-      _resumeJourney(savedId);
-    }
-  }
-
-  Future<void> _resumeJourney(String id) async {
     setState(() => _isLoading = true);
     try {
-      final record = await PbService().pb.collection('partner').getOne(id);
-      setState(() {
-        _draftId = id;
-        _nameController.text = record.getStringValue('partner_name');
-        _emailController.text = record.getStringValue('email');
-        _mobileController.text = record.getStringValue('mobile_no');
-        _personController.text = record.getStringValue('key_person_name');
-        _billingAddressController.text = record.getStringValue('billing_address');
-        _billingLandmarkController.text = record.getStringValue('billing_landmark');
-        _billingCityController.text = record.getStringValue('billing_city');
-        _billingStateController.text = record.getStringValue('billing_state');
-        _billingPincodeController.text = record.getStringValue('billing_pincode');
-        
-        _hasDifferentShipping = record.getBoolValue('has_different_shipping_address');
-        _shippingBusinessController.text = record.getStringValue('shipping_business_name');
-        _shippingAddressController.text = record.getStringValue('shipping_address');
-        _shippingLandmarkController.text = record.getStringValue('shipping_landmark');
-        _shippingCityController.text = record.getStringValue('shipping_city');
-        _shippingStateController.text = record.getStringValue('shipping_pincode');
-        
-        _panController.text = record.getStringValue('pan_no');
-        _gstController.text = record.getStringValue('gst_no');
-        _bankNameController.text = record.getStringValue('bank_name');
-        _bankAcController.text = record.getStringValue('bank_ac_no');
-        _bankIfscController.text = record.getStringValue('bank_ifsc_code');
-        
-        _partnerType = record.getStringValue('partner_type').isEmpty ? 'dealer' : record.getStringValue('partner_type');
-        _entityType = record.getStringValue('entity_type').isEmpty ? 'proprietor' : record.getStringValue('entity_type');
-        _bankAcType = record.getStringValue('bank_ac_type').isEmpty ? 'saving' : record.getStringValue('bank_ac_type');
-        _gstFrequency = record.getStringValue('gst_filing_frequency').isEmpty ? 'monthly' : record.getStringValue('gst_filing_frequency');
-        
-        final dateStr = record.getStringValue('partner_onboarding_date');
-        if (dateStr.isNotEmpty) _onboardingDate = DateTime.parse(dateStr);
-      });
-      if (mounted) AppSnackBars.showSuccess(context, 'Resuming journey');
-    } catch (e) {
-      final prefs = await SharedPreferences.getInstance();
-      prefs.remove('pending_partner_onboarding_id');
+      final localData = await DraftManager.getLocalDraft();
+      if (localData != null) {
+        _populateForm(localData);
+        _draftId = await DraftManager.getDraftId();
+        if (mounted) AppSnackBars.showSuccess(context, 'Resuming from local cache');
+      } else {
+        // Fallback to server ID check if local cache was cleared but ID remains
+        final savedId = await DraftManager.getDraftId();
+        if (savedId != null) {
+          await _resumeFromServer(savedId);
+        }
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  Future<void> _resumeFromServer(String id) async {
+    try {
+      final record = await PbService().pb.collection('partner').getOne(id);
+      _populateForm(record.toJson());
+      _draftId = id;
+    } catch (e) {
+      await DraftManager.clearLocalDraft();
+    }
+  }
+
+  void _populateForm(Map<String, dynamic> data) {
+    setState(() {
+      _nameController.text = data['partner_name'] ?? '';
+      _emailController.text = data['email'] ?? '';
+      _mobileController.text = data['mobile_no'] ?? '';
+      _personController.text = data['key_person_name'] ?? '';
+      _billingAddressController.text = data['billing_address'] ?? '';
+      _billingLandmarkController.text = data['billing_landmark'] ?? '';
+      _billingCityController.text = data['billing_city'] ?? '';
+      _billingStateController.text = data['billing_state'] ?? '';
+      _billingPincodeController.text = data['billing_pincode'] ?? '';
+      
+      _hasDifferentShipping = data['has_different_shipping_address'] ?? false;
+      _shippingBusinessController.text = data['shipping_business_name'] ?? '';
+      _shippingAddressController.text = data['shipping_address'] ?? '';
+      _shippingLandmarkController.text = data['shipping_landmark'] ?? '';
+      _shippingCityController.text = data['shipping_city'] ?? '';
+      _shippingStateController.text = data['shipping_pincode'] ?? '';
+      
+      _panController.text = data['pan_no'] ?? '';
+      _gstController.text = data['gst_no'] ?? '';
+      _bankNameController.text = data['bank_name'] ?? '';
+      _bankAcController.text = data['bank_ac_no'] ?? '';
+      _bankIfscController.text = data['bank_ifsc_code'] ?? '';
+      
+      _partnerType = data['partner_type']?.toString().isEmpty ?? true ? 'dealer' : data['partner_type'];
+      _entityType = data['entity_type']?.toString().isEmpty ?? true ? 'proprietor' : data['entity_type'];
+      _bankAcType = data['bank_ac_type']?.toString().isEmpty ?? true ? 'saving' : data['bank_ac_type'];
+      _gstFrequency = data['gst_filing_frequency']?.toString().isEmpty ?? true ? 'monthly' : data['gst_filing_frequency'];
+      
+      if (data['partner_onboarding_date'] != null) {
+        _onboardingDate = DateTime.parse(data['partner_onboarding_date']);
+      }
+    });
+  }
+
   void _handleClear() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('pending_partner_onboarding_id');
-    
+    await DraftManager.clearLocalDraft();
     setState(() {
       _draftId = null;
       _currentStep = 0;
@@ -139,76 +156,110 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       _bankAcController.clear();
       _bankIfscController.clear();
       _onboardingDate = DateTime.now();
+      _syncStatus = SyncStatus.idle;
     });
-    
-    if (mounted) AppSnackBars.showSuccess(context, 'Form cleared. You can start a new journey.');
+    if (mounted) AppSnackBars.showSuccess(context, 'Form cleared');
   }
 
+  /// The core Local-First Save Logic
   Future<void> _handleSaveData({bool isFinal = false}) async {
-    setState(() => _isLoading = true);
-    try {
-      final repo = ref.read(partnerRepositoryProvider);
-      String partnerCode = '';
-      if (isFinal) {
-        partnerCode = await repo.getNextPartnerCode();
-      }
+    // 1. Prepare data
+    final repo = ref.read(partnerRepositoryProvider);
+    String partnerCode = '';
+    
+    // We only generate code if FINISHING
+    if (isFinal) {
+      setState(() => _isLoading = true);
+      partnerCode = await repo.getNextPartnerCode();
+    }
 
-      final body = {
-        'partner_name': _nameController.text.trim(),
-        'partner_code': partnerCode,
-        'partner_type': _partnerType,
-        'entity_type': _entityType,
-        'key_person_name': _personController.text.trim(),
-        'mobile_no': _mobileController.text.trim(),
-        'email': _emailController.text.trim(),
-        'billing_address': _billingAddressController.text.trim(),
-        'billing_landmark': _billingLandmarkController.text.trim(),
-        'billing_city': _billingCityController.text.trim(),
-        'billing_state': _billingStateController.text.trim(),
-        'billing_pincode': _billingPincodeController.text.trim(),
-        'has_different_shipping_address': _hasDifferentShipping,
-        'shipping_business_name': _shippingBusinessController.text.trim(),
-        'shipping_address': _shippingAddressController.text.trim(),
-        'shipping_landmark': _shippingLandmarkController.text.trim(),
-        'shipping_city': _shippingCityController.text.trim(),
-        'shipping_state': _shippingStateController.text.trim(),
-        'shipping_pincode': _shippingPincodeController.text.trim(),
-        'pan_no': _panController.text.trim(),
-        'gst_no': _gstController.text.trim(),
-        'gst_filing_frequency': _gstFrequency,
-        'bank_name': _bankNameController.text.trim(),
-        'bank_ac_no': _bankAcController.text.trim(),
-        'bank_ifsc_code': _bankIfscController.text.trim(),
-        'bank_ac_type': _bankAcType,
-        'partner_onboarding_date': _onboardingDate.toIso8601String(),
-        'partner_active': isFinal,
-      };
+    final body = {
+      'id': _draftId,
+      'partner_name': _nameController.text.trim(),
+      'partner_code': partnerCode,
+      'partner_type': _partnerType,
+      'entity_type': _entityType,
+      'key_person_name': _personController.text.trim(),
+      'mobile_no': _mobileController.text.trim(),
+      'email': _emailController.text.trim(),
+      'billing_address': _billingAddressController.text.trim(),
+      'billing_landmark': _billingLandmarkController.text.trim(),
+      'billing_city': _billingCityController.text.trim(),
+      'billing_state': _billingStateController.text.trim(),
+      'billing_pincode': _billingPincodeController.text.trim(),
+      'has_different_shipping_address': _hasDifferentShipping,
+      'shipping_business_name': _shippingBusinessController.text.trim(),
+      'shipping_address': _shippingAddressController.text.trim(),
+      'shipping_landmark': _shippingLandmarkController.text.trim(),
+      'shipping_city': _shippingCityController.text.trim(),
+      'shipping_state': _shippingStateController.text.trim(),
+      'shipping_pincode': _shippingPincodeController.text.trim(),
+      'pan_no': _panController.text.trim(),
+      'gst_no': _gstController.text.trim(),
+      'gst_filing_frequency': _gstFrequency,
+      'bank_name': _bankNameController.text.trim(),
+      'bank_ac_no': _bankAcController.text.trim(),
+      'bank_ifsc_code': _bankIfscController.text.trim(),
+      'bank_ac_type': _bankAcType,
+      'partner_onboarding_date': AppDateUtils.toServerDate(_onboardingDate).toIso8601String(),
+      'partner_active': isFinal,
+    };
 
-      if (_draftId == null) {
-        final record = await PbService().pb.collection('partner').create(body: body);
-        _draftId = record.id;
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('pending_partner_onboarding_id', _draftId!);
-      } else {
-        await PbService().pb.collection('partner').update(_draftId!, body: body);
-      }
-
-      if (isFinal) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('pending_partner_onboarding_id');
+    // 2. INSTANT SAVE TO LOCAL
+    await DraftManager.saveLocalDraft(body);
+    
+    if (isFinal) {
+      // For final submission, we do a blocking sync
+      try {
+        if (_draftId == null) {
+          await PbService().pb.collection('partner').create(body: body);
+        } else {
+          await PbService().pb.collection('partner').update(_draftId!, body: body);
+        }
+        await DraftManager.clearLocalDraft();
         if (mounted) {
-          AppSnackBars.showSuccess(context, 'Onboarded: $partnerCode');
+          AppSnackBars.showSuccess(context, 'Partner Onboarded: $partnerCode');
           ref.invalidate(allPartnersProvider);
           Navigator.of(context).pop();
         }
-      } else {
-        if (mounted) AppSnackBars.showSuccess(context, 'Draft saved');
-        ref.invalidate(allPartnersProvider);
+      } catch (e) {
+        if (mounted) AppSnackBars.showError(context, 'Final sync failed: $e');
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
+    } else {
+      // 3. SILENT BACKGROUND SYNC for drafts
+      _startBackgroundSync(body);
+      if (mounted) AppSnackBars.showSuccess(context, 'Saved locally');
+    }
+  }
+
+  Future<void> _startBackgroundSync(Map<String, dynamic> body) async {
+    if (_syncStatus == SyncStatus.syncing) return;
+    
+    setState(() => _syncStatus = SyncStatus.syncing);
+    try {
+      if (_draftId == null) {
+        final record = await PbService().pb.collection('partner').create(body: body);
+        _draftId = record.id;
+        // Update local with the new ID
+        body['id'] = _draftId;
+        await DraftManager.saveLocalDraft(body);
+      } else {
+        try {
+          await PbService().pb.collection('partner').update(_draftId!, body: body);
+        } catch (e) {
+          if (e is ClientException && e.statusCode == 404) {
+            _draftId = null;
+            return _startBackgroundSync(body); // Self-heal
+          }
+          rethrow;
+        }
+      }
+      setState(() => _syncStatus = SyncStatus.synced);
+      ref.invalidate(allPartnersProvider);
     } catch (e) {
-      if (mounted) AppSnackBars.showError(context, 'Error: $e');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      setState(() => _syncStatus = SyncStatus.error);
     }
   }
 
@@ -224,12 +275,16 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       appBar: AppBar(
         title: const Text('Partner Onboarding'),
         elevation: 0,
+        actions: [
+          _buildSyncIndicator(),
+          const SizedBox(width: 16),
+        ],
       ),
       body: Column(
         children: [
           _buildProgressIndicator(),
           Expanded(
-            child: _isLoading && _currentStep == 0 && _draftId != null
+            child: _isLoading && _currentStep == 0 && _draftId == null
                 ? const Center(child: CircularProgressIndicator())
                 : SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
@@ -240,6 +295,19 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildSyncIndicator() {
+    switch (_syncStatus) {
+      case SyncStatus.syncing:
+        return const Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)));
+      case SyncStatus.synced:
+        return const Icon(Icons.cloud_done_outlined, size: 20, color: Colors.green);
+      case SyncStatus.error:
+        return const Icon(Icons.cloud_off_outlined, size: 20, color: Colors.redAccent);
+      default:
+        return const Icon(Icons.cloud_queue_rounded, size: 20, color: AppColors.textMuted);
+    }
   }
 
   Widget _buildStepContent() {
@@ -425,7 +493,6 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       child: SafeArea(
         child: Row(
           children: [
-            // CLEAR BUTTON
             Expanded(
               child: _CompactButton(
                 text: 'CLEAR',
@@ -435,20 +502,15 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            
-            // SAVE DATA BUTTON
             Expanded(
               child: _CompactButton(
                 text: 'SAVE DATA',
                 onPressed: () => _handleSaveData(isFinal: false),
                 color: AppColors.primary,
                 isOutline: true,
-                isLoading: _isLoading,
               ),
             ),
             const SizedBox(width: 8),
-
-            // CONTINUE / FINISH BUTTON
             Expanded(
               child: _CompactButton(
                 text: _currentStep == 3 ? 'FINISH' : 'CONTINUE',
@@ -505,7 +567,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   Widget _buildDatePicker() {
     return InkWell(
       onTap: () async {
-        final picked = await showDatePicker(
+        final picked = await AppPickers.showScrollableDatePicker(
           context: context,
           initialDate: _onboardingDate,
           firstDate: DateTime(2020),
@@ -532,7 +594,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
               ],
             ),
             const Spacer(),
-            const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
+            const Icon(Icons.expand_more_rounded, size: 20, color: AppColors.textMuted),
           ],
         ),
       ),

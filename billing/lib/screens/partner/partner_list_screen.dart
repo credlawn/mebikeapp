@@ -6,6 +6,7 @@ import '../../providers/partner_provider.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../theme/app_snackbars.dart';
+import '../../services/draft_manager.dart';
 import 'add_partner_screen.dart';
 
 class PartnerListScreen extends ConsumerWidget {
@@ -182,9 +183,15 @@ class _PartnerTile extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
+          onTap: () async {
             if (isDraft) {
-              // Future: Resume Onboarding directly
+              // Pre-load into local cache for instant resume
+              await DraftManager.saveLocalDraft(partner.toJson());
+              if (context.mounted) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AddPartnerScreen()),
+                );
+              }
             }
           },
           borderRadius: BorderRadius.circular(12),
