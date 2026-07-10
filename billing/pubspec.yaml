@@ -34,10 +34,11 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  pocketbase: ^0.23.2
+  pocketbase: ^0.24.0
   google_fonts: ^8.0.2
   shared_preferences: ^2.5.5
   local_auth: ^3.0.1
+  local_auth_android: any
   pinput: ^6.0.2
   crypto: ^3.0.7
   flutter_riverpod: ^3.3.1

@@ -107,7 +107,7 @@ class _CompanyDashboardState extends ConsumerState<CompanyDashboard> with Single
                     subtitle: partnersAsync.when(
                       data: (_) => '$totalRegisteredCount Total Registered',
                       loading: () => 'Syncing partners...',
-                      error: (_, __) => 'Offline mode',
+                      error: (_, _) => 'Offline mode',
                     ),
                     icon: Icons.people_alt_rounded,
                     color: AppColors.primary,
@@ -152,7 +152,7 @@ class _CompanyDashboardState extends ConsumerState<CompanyDashboard> with Single
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -166,7 +166,7 @@ class _CompanyDashboardState extends ConsumerState<CompanyDashboard> with Single
               decoration: BoxDecoration(
                 color: color,
                 shape: BoxShape.circle,
-                boxShadow: isOnline ? [BoxShadow(color: color.withOpacity(0.4), blurRadius: 4, spreadRadius: 1)] : null,
+                boxShadow: isOnline ? [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 4, spreadRadius: 1)] : null,
               ),
             ),
           ),
@@ -234,7 +234,7 @@ class ModuleCard extends StatelessWidget {
           border: Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -246,7 +246,7 @@ class ModuleCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 24),
@@ -265,7 +265,7 @@ class ModuleCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(

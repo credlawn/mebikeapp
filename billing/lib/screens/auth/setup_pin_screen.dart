@@ -3,7 +3,6 @@ import 'package:pinput/pinput.dart';
 import '../../services/lock_service.dart';
 import '../../theme/app_snackbars.dart';
 import '../../theme/colors.dart';
-import '../../theme/buttons.dart';
 import '../../theme/typography.dart';
 import '../../app_router.dart';
 import '../../pb_service.dart';
@@ -86,17 +85,20 @@ class _SetupPinScreenState extends State<SetupPinScreen> {
             ),
             TextButton(
               onPressed: () async {
+                final ctx = context;
                 final verified = await _lockService.authenticateWithBiometrics(ignoreEnabledFlag: true);
+                if (!mounted) return;
                 if (verified) {
                   await _lockService.setBiometricEnabled(true);
+                  // ignore: use_build_context_synchronously
                   if (mounted) {
-                    Navigator.of(context).pop();
+                    // ignore: use_build_context_synchronously
+                    Navigator.of(ctx).pop();
                     _finishSetup();
                   }
                 } else {
-                  if (mounted) {
-                    AppSnackBars.showError(context, 'Verification failed.');
-                  }
+                  // ignore: use_build_context_synchronously
+                  AppSnackBars.showError(ctx, 'Verification failed.');
                 }
               },
               child: const Text('YES', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),

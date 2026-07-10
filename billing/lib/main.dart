@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'login_screen.dart';
 import 'theme/colors.dart';
 import 'pb_service.dart';
-import 'screens/auth/change_password_screen.dart';
 import 'services/lock_service.dart';
-import 'screens/auth/setup_pin_screen.dart';
 import 'screens/auth/app_lock_screen.dart';
 import 'screens/auth/splash_screen.dart';
-import 'app_router.dart';
 import 'screens/partner/partner_list_screen.dart';
 import 'screens/partner/add_partner_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

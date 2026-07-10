@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/partner_provider.dart';
 import '../pb_service.dart';
@@ -17,7 +18,7 @@ class PreloaderService {
   static Future<void> preloadAppData(WidgetRef ref) async {
     try {
       final pb = PbService().pb;
-      final role = pb.authStore.record?.getStringValue('role')?.toLowerCase() ?? '';
+      final role = (pb.authStore.record?.getStringValue('role') ?? '').toLowerCase();
       
       final providersToLoad = _roleRegistry[role] ?? [];
       if (providersToLoad.isEmpty) return;
@@ -40,16 +41,16 @@ class PreloaderService {
         await Future.wait(futures).timeout(
           const Duration(seconds: 5),
           onTimeout: () {
-            print('Preloader Log: Safety timeout hit after 5s. Moving to dashboard.');
+            debugPrint('Preloader Log: Safety timeout hit after 5s. Moving to dashboard.');
             return []; 
           },
         );
       }
       
-      print('Preloader Log: Successfully preloaded ${providersToLoad.length} modules for role: $role');
+      debugPrint('Preloader Log: Successfully preloaded ${providersToLoad.length} modules for role: $role');
 
     } catch (e) {
-      print('Preloader Log: Preloading finished with fallback: $e');
+      debugPrint('Preloader Log: Preloading finished with fallback: $e');
     }
   }
 }

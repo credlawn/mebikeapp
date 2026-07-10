@@ -85,6 +85,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
       _pinController.clear();
       _pinFocusNode.requestFocus();
 
+      if (!mounted) return;
       if (_lockService.isLockedOut) {
         AppSnackBars.showError(context, 'Too many attempts. Cooldown active.');
         _startCooldownTimer();
@@ -153,7 +154,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (_) => SystemNavigator.pop(),
+      onPopInvokedWithResult: (_, _) => SystemNavigator.pop(),
       child: Scaffold(
         backgroundColor: Colors.white,
         body: _buildBody(),

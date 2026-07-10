@@ -2,32 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pocketbase/pocketbase.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/partner_provider.dart';
 import '../../pb_service.dart';
 import '../../theme/app_snackbars.dart';
 import '../../theme/colors.dart';
-import '../../theme/buttons.dart';
 import '../../theme/typography.dart';
 import '../../theme/pickers.dart';
 import '../../services/date_utils.dart';
-import '../../services/draft_manager.dart';
-
-enum SyncStatus { idle, syncing, synced, error }
 
 class AddPartnerScreen extends ConsumerStatefulWidget {
-  const AddPartnerScreen({super.key});
+  final String? draftId;
+
+  const AddPartnerScreen({super.key, this.draftId});
 
   @override
   ConsumerState<AddPartnerScreen> createState() => _AddPartnerScreenState();
 }
 
+enum _SyncState { syncing, synced, error }
+
 class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
+  static const _timeout = Duration(seconds: 15);
+
   final _formKey = GlobalKey<FormState>();
   int _currentStep = 0;
-  bool _isLoading = false; // For blocking actions like FINISH
-  SyncStatus _syncStatus = SyncStatus.idle;
+  bool _isLoading = false;
   String? _draftId;
+  _SyncState? _syncState;
 
   // Controllers
   final _nameController = TextEditingController();
@@ -61,36 +62,21 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   @override
   void initState() {
     super.initState();
-    _checkAndResumeDraft();
-  }
-
-  Future<void> _checkAndResumeDraft() async {
-    setState(() => _isLoading = true);
-    try {
-      final localData = await DraftManager.getLocalDraft();
-      if (localData != null) {
-        _populateForm(localData);
-        _draftId = await DraftManager.getDraftId();
-        if (mounted) AppSnackBars.showSuccess(context, 'Resuming from local cache');
-      } else {
-        // Fallback to server ID check if local cache was cleared but ID remains
-        final savedId = await DraftManager.getDraftId();
-        if (savedId != null) {
-          await _resumeFromServer(savedId);
-        }
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    if (widget.draftId != null) {
+      _loadFromServer(widget.draftId!);
     }
   }
 
-  Future<void> _resumeFromServer(String id) async {
+  Future<void> _loadFromServer(String id) async {
+    setState(() => _isLoading = true);
     try {
-      final record = await PbService().pb.collection('partner').getOne(id);
+      final record = await PbService().pb.collection('partner').getOne(id).timeout(_timeout);
       _populateForm(record.toJson());
       _draftId = id;
     } catch (e) {
-      await DraftManager.clearLocalDraft();
+      if (mounted) AppSnackBars.showError(context, 'Cannot reach server');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -111,7 +97,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       _shippingAddressController.text = data['shipping_address'] ?? '';
       _shippingLandmarkController.text = data['shipping_landmark'] ?? '';
       _shippingCityController.text = data['shipping_city'] ?? '';
-      _shippingStateController.text = data['shipping_pincode'] ?? '';
+      _shippingStateController.text = data['shipping_state'] ?? '';
       
       _panController.text = data['pan_no'] ?? '';
       _gstController.text = data['gst_no'] ?? '';
@@ -130,8 +116,16 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     });
   }
 
-  void _handleClear() async {
-    await DraftManager.clearLocalDraft();
+  Future<void> _handleClear() async {
+    final confirmed = await _showClearConfirmDialog();
+    if (confirmed != true) return;
+
+    try {
+      if (_draftId != null) {
+        await PbService().pb.collection('partner').delete(_draftId!);
+      }
+    } catch (_) {}
+    if (!mounted) return;
     setState(() {
       _draftId = null;
       _currentStep = 0;
@@ -156,25 +150,172 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       _bankAcController.clear();
       _bankIfscController.clear();
       _onboardingDate = DateTime.now();
-      _syncStatus = SyncStatus.idle;
     });
     if (mounted) AppSnackBars.showSuccess(context, 'Form cleared');
   }
 
-  /// The core Local-First Save Logic
-  Future<void> _handleSaveData({bool isFinal = false}) async {
-    // 1. Prepare data
-    final repo = ref.read(partnerRepositoryProvider);
-    String partnerCode = '';
-    
-    // We only generate code if FINISHING
-    if (isFinal) {
-      setState(() => _isLoading = true);
-      partnerCode = await repo.getNextPartnerCode();
-    }
+  Future<bool?> _showClearConfirmDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.delete_outline_rounded,
+                color: AppColors.error,
+                size: 28,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Clear Form?', style: AppTypography.h2.copyWith(fontSize: 18)),
+            const SizedBox(height: 12),
+            Text(
+              'This will permanently delete the saved draft from the server. You will lose all entered data.',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary, width: 1.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text('Cancel', style: AppTypography.button.copyWith(color: AppColors.primary)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text('Clear', style: AppTypography.button.copyWith(color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
-    final body = {
-      'id': _draftId,
+  Future<String?> _showFinishConfirmDialog() {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.flag_outlined,
+                color: AppColors.primary,
+                size: 28,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Finalize Partner', style: AppTypography.h2.copyWith(fontSize: 18)),
+            const SizedBox(height: 12),
+            Text(
+              'A partner code will be generated and the partner will be moved out of drafts. Choose the initial status:',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(ctx).pop('inactive'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textMuted,
+                    side: BorderSide(color: AppColors.textMuted.withValues(alpha: 0.4), width: 1.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text('Keep Inactive', style: AppTypography.button.copyWith(color: AppColors.textMuted)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop('active'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text('Make Active', style: AppTypography.button.copyWith(color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Map<String, dynamic> _buildBody({String partnerCode = '', String status = 'draft'}) {
+    return {
       'partner_name': _nameController.text.trim(),
       'partner_code': partnerCode,
       'partner_type': _partnerType,
@@ -202,64 +343,88 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       'bank_ifsc_code': _bankIfscController.text.trim(),
       'bank_ac_type': _bankAcType,
       'partner_onboarding_date': AppDateUtils.toServerDate(_onboardingDate).toIso8601String(),
-      'partner_active': isFinal,
+      'partner_status': status,
     };
+  }
 
-    // 2. INSTANT SAVE TO LOCAL
-    await DraftManager.saveLocalDraft(body);
-    
-    if (isFinal) {
-      // For final submission, we do a blocking sync
-      try {
-        if (_draftId == null) {
-          await PbService().pb.collection('partner').create(body: body);
-        } else {
-          await PbService().pb.collection('partner').update(_draftId!, body: body);
-        }
-        await DraftManager.clearLocalDraft();
+  void _resetSyncState() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _syncState = null);
+    });
+  }
+
+  Future<void> _handleSaveData({required bool isFinal, bool advanceStep = false, String status = 'draft'}) async {
+    setState(() {
+      _isLoading = true;
+      _syncState = _SyncState.syncing;
+    });
+    try {
+      final repo = ref.read(partnerRepositoryProvider);
+      String partnerCode = '';
+
+      if (isFinal) {
+        partnerCode = await repo.getNextPartnerCode().timeout(_timeout);
+      }
+
+      final body = _buildBody(partnerCode: partnerCode, status: isFinal ? status : 'draft');
+
+      if (_draftId == null) {
+        final record = await PbService().pb.collection('partner').create(body: body).timeout(_timeout);
+        _draftId = record.id;
+      } else {
+        await PbService().pb.collection('partner').update(_draftId!, body: body).timeout(_timeout);
+      }
+
+      if (isFinal) {
         if (mounted) {
           AppSnackBars.showSuccess(context, 'Partner Onboarded: $partnerCode');
-          ref.invalidate(allPartnersProvider);
           Navigator.of(context).pop();
         }
-      } catch (e) {
-        if (mounted) AppSnackBars.showError(context, 'Final sync failed: $e');
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
+        WidgetsBinding.instance.addPostFrameCallback((_) => ref.invalidate(allPartnersProvider));
+      } else {
+        if (mounted) {
+          setState(() {
+            _syncState = _SyncState.synced;
+            if (advanceStep) _currentStep++;
+          });
+          _resetSyncState();
+        }
       }
-    } else {
-      // 3. SILENT BACKGROUND SYNC for drafts
-      _startBackgroundSync(body);
-      if (mounted) AppSnackBars.showSuccess(context, 'Saved locally');
+    } on ClientException catch (e) {
+      if (mounted) {
+        if (e.statusCode == 404) {
+          _draftId = null;
+          setState(() => _syncState = _SyncState.error);
+          _resetSyncState();
+        } else {
+          setState(() => _syncState = _SyncState.error);
+          _resetSyncState();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _syncState = _SyncState.error);
+        _resetSyncState();
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _startBackgroundSync(Map<String, dynamic> body) async {
-    if (_syncStatus == SyncStatus.syncing) return;
-    
-    setState(() => _syncStatus = SyncStatus.syncing);
-    try {
-      if (_draftId == null) {
-        final record = await PbService().pb.collection('partner').create(body: body);
-        _draftId = record.id;
-        // Update local with the new ID
-        body['id'] = _draftId;
-        await DraftManager.saveLocalDraft(body);
-      } else {
-        try {
-          await PbService().pb.collection('partner').update(_draftId!, body: body);
-        } catch (e) {
-          if (e is ClientException && e.statusCode == 404) {
-            _draftId = null;
-            return _startBackgroundSync(body); // Self-heal
-          }
-          rethrow;
-        }
-      }
-      setState(() => _syncStatus = SyncStatus.synced);
-      ref.invalidate(allPartnersProvider);
-    } catch (e) {
-      setState(() => _syncStatus = SyncStatus.error);
+  Widget _buildSyncIndicator() {
+    switch (_syncState) {
+      case _SyncState.syncing:
+        return const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+        );
+      case _SyncState.synced:
+        return const Icon(Icons.cloud_done_outlined, size: 22, color: Colors.green);
+      case _SyncState.error:
+        return const Icon(Icons.cloud_off_outlined, size: 22, color: AppColors.error);
+      default:
+        return const Icon(Icons.cloud_queue_rounded, size: 22, color: AppColors.textMuted);
     }
   }
 
@@ -284,7 +449,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
         children: [
           _buildProgressIndicator(),
           Expanded(
-            child: _isLoading && _currentStep == 0 && _draftId == null
+            child: _isLoading && _currentStep == 0
                 ? const Center(child: CircularProgressIndicator())
                 : SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
@@ -295,19 +460,6 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
         ],
       ),
     );
-  }
-
-  Widget _buildSyncIndicator() {
-    switch (_syncStatus) {
-      case SyncStatus.syncing:
-        return const Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)));
-      case SyncStatus.synced:
-        return const Icon(Icons.cloud_done_outlined, size: 20, color: Colors.green);
-      case SyncStatus.error:
-        return const Icon(Icons.cloud_off_outlined, size: 20, color: Colors.redAccent);
-      default:
-        return const Icon(Icons.cloud_queue_rounded, size: 20, color: AppColors.textMuted);
-    }
   }
 
   Widget _buildStepContent() {
@@ -392,7 +544,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
               title: Text('Different Shipping Address?', style: AppTypography.h3),
               value: _hasDifferentShipping,
               onChanged: (v) => setState(() => _hasDifferentShipping = v),
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
               contentPadding: EdgeInsets.zero,
             ),
             if (_hasDifferentShipping) ...[
@@ -488,7 +640,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, -5))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, -5))],
       ),
       child: SafeArea(
         child: Row(
@@ -508,18 +660,22 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
                 onPressed: () => _handleSaveData(isFinal: false),
                 color: AppColors.primary,
                 isOutline: true,
+                isLoading: _isLoading,
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: _CompactButton(
                 text: _currentStep == 3 ? 'FINISH' : 'CONTINUE',
-                onPressed: () {
+                onPressed: () async {
                   if (_formKey.currentState!.validate()) {
                     if (_currentStep < 3) {
-                      setState(() => _currentStep++);
+                      _handleSaveData(isFinal: false, advanceStep: true);
                     } else {
-                      _handleSaveData(isFinal: true);
+                      final chosenStatus = await _showFinishConfirmDialog();
+                      if (chosenStatus != null && mounted) {
+                        _handleSaveData(isFinal: true, status: chosenStatus);
+                      }
                     }
                   }
                 },

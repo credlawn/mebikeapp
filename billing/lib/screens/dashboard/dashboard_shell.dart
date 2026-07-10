@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../pb_service.dart';
 import '../../login_screen.dart';

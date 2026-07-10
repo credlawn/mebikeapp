@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../services/lock_service.dart';
 import '../../pb_service.dart';
 import '../../login_screen.dart';
 import '../../services/preloader_service.dart';
@@ -21,7 +20,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
-    final lockService = LockService();
     final pbService = PbService();
 
     // 1. Minimum delay for the animation to look good

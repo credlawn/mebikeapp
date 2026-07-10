@@ -6,8 +6,8 @@ import '../../providers/partner_provider.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../theme/app_snackbars.dart';
-import '../../services/draft_manager.dart';
 import 'add_partner_screen.dart';
+import 'partner_detail_screen.dart';
 
 class PartnerListScreen extends ConsumerWidget {
   const PartnerListScreen({super.key});
@@ -154,7 +154,7 @@ class _PartnerList extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               physics: const AlwaysScrollableScrollPhysics(),
               itemCount: partners.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final partner = partners[index];
                 return _PartnerTile(partner: partner, isDraft: isDraft);
@@ -183,15 +183,15 @@ class _PartnerTile extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () async {
+          onTap: () {
             if (isDraft) {
-              // Pre-load into local cache for instant resume
-              await DraftManager.saveLocalDraft(partner.toJson());
-              if (context.mounted) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AddPartnerScreen()),
-                );
-              }
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => AddPartnerScreen(draftId: partner.id)),
+              );
+            } else {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => PartnerDetailScreen(partnerId: partner.id)),
+              );
             }
           },
           borderRadius: BorderRadius.circular(12),

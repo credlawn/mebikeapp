@@ -37,7 +37,7 @@ class Partner {
   final String bankIfscCode;
   final String bankAcType; // saving, current
 
-  final bool partnerActive;
+  final String partnerStatus;
   final DateTime created;
   final DateTime updated;
   final DateTime? onboardingDate;
@@ -73,7 +73,7 @@ class Partner {
     required this.bankAcNo,
     required this.bankIfscCode,
     required this.bankAcType,
-    required this.partnerActive,
+    required this.partnerStatus,
     required this.created,
     required this.updated,
     this.onboardingDate,
@@ -116,7 +116,7 @@ class Partner {
       bankIfscCode: json['bank_ifsc_code'] ?? '',
       bankAcType: json['bank_ac_type'] ?? 'saving',
       
-      partnerActive: json['partner_active'] ?? false,
+      partnerStatus: json['partner_status'] ?? '',
       created: DateTime.parse(json['created']),
       updated: DateTime.parse(json['updated']),
       onboardingDate: json['partner_onboarding_date'] != null && json['partner_onboarding_date'].toString().isNotEmpty
@@ -156,7 +156,7 @@ class Partner {
       'bank_ac_no': bankAcNo,
       'bank_ifsc_code': bankIfscCode,
       'bank_ac_type': bankAcType,
-      'partner_active': partnerActive,
+      'partner_status': partnerStatus,
       'partner_onboarding_date': onboardingDate?.toIso8601String(),
       'partner_offboarding_date': offboardingDate?.toIso8601String(),
     };

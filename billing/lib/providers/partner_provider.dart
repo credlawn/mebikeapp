@@ -50,20 +50,20 @@ final allPartnersProvider = FutureProvider<List<Partner>>((ref) async {
   return repo.getAllPartners();
 });
 
-// Selector for Active Partners (Code exists + Active true)
+// Selector for Active Partners (empty = legacy records, treat as active)
 final activePartnersProvider = Provider<List<Partner>>((ref) {
   final all = ref.watch(allPartnersProvider).value ?? [];
-  return all.where((p) => p.partnerActive && p.partnerCode.isNotEmpty).toList();
+  return all.where((p) => p.partnerStatus == 'active' || p.partnerStatus.isEmpty).toList();
 });
 
-// Selector for Inactive Partners (Code exists + Active false)
+// Selector for Inactive Partners
 final inactivePartnersProvider = Provider<List<Partner>>((ref) {
   final all = ref.watch(allPartnersProvider).value ?? [];
-  return all.where((p) => !p.partnerActive && p.partnerCode.isNotEmpty).toList();
+  return all.where((p) => p.partnerStatus == 'inactive').toList();
 });
 
-// Selector for Draft Partners (No Partner Code)
+// Selector for Draft Partners
 final draftPartnersProvider = Provider<List<Partner>>((ref) {
   final all = ref.watch(allPartnersProvider).value ?? [];
-  return all.where((p) => p.partnerCode.isEmpty).toList();
+  return all.where((p) => p.partnerStatus == 'draft').toList();
 });
