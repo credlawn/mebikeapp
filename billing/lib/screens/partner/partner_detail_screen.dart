@@ -241,10 +241,10 @@ class _PartnerDetailScreenState extends ConsumerState<PartnerDetailScreen> {
                         child: Column(
                           children: [
                             _buildSection('Business Profile', [
-                              _buildRow('Partner Name', _partner!.partnerName),
-                              _buildRow('Partner Code', _partner!.partnerCode),
-                              _buildRow('Partner Type', _toTitleCase(_partner!.partnerType)),
                               _buildRow('Entity Type', _toTitleCase(_partner!.entityType)),
+                              _buildRow('Partner Type', _toTitleCase(_partner!.partnerType)),
+                              _buildRow('Partner Code', _partner!.partnerCode),
+                              _buildRow('Partner Name', _partner!.partnerName),
                               _buildRow('Email', _partner!.email),
                               if (_partner!.onboardingDate != null)
                                 _buildRow('Onboarding Date', DateFormat('dd MMM yyyy').format(_partner!.onboardingDate!)),
@@ -259,6 +259,7 @@ class _PartnerDetailScreenState extends ConsumerState<PartnerDetailScreen> {
                               _buildRow('Address', _partner!.billingAddress),
                               if (_partner!.billingLandmark.isNotEmpty) _buildRow('Landmark', _partner!.billingLandmark),
                               _buildRow('City', _partner!.billingCity),
+                              if (_partner!.billingDistrict.isNotEmpty) _buildRow('District', _partner!.billingDistrict),
                               _buildRow('State', _partner!.billingState),
                               _buildRow('Pincode', _partner!.billingPincode),
                             ]),
@@ -269,19 +270,21 @@ class _PartnerDetailScreenState extends ConsumerState<PartnerDetailScreen> {
                                 _buildRow('Address', _partner!.shippingAddress),
                                 if (_partner!.shippingLandmark.isNotEmpty) _buildRow('Landmark', _partner!.shippingLandmark),
                                 _buildRow('City', _partner!.shippingCity),
+                                if (_partner!.shippingDistrict.isNotEmpty) _buildRow('District', _partner!.shippingDistrict),
                                 _buildRow('State', _partner!.shippingState),
                                 _buildRow('Pincode', _partner!.shippingPincode),
                               ]),
                             ],
                             const SizedBox(height: 12),
                             _buildSection('Finance & Banking', [
-                              if (_partner!.gstNo.isNotEmpty) _buildRow('GST No', _partner!.gstNo),
                               if (_partner!.gstFilingFrequency.isNotEmpty) _buildRow('GST Filing', _toTitleCase(_partner!.gstFilingFrequency)),
+                              if (_partner!.gstNo.isNotEmpty) _buildRow('GST No', _partner!.gstNo),
                               if (_partner!.panNo.isNotEmpty) _buildRow('PAN No', _partner!.panNo),
-                              if (_partner!.bankName.isNotEmpty) _buildRow('Bank Name', _partner!.bankName),
+                              if (_partner!.bankAcType.isNotEmpty) _buildRow('Account Type', _toTitleCase(_partner!.bankAcType)),
                               if (_partner!.bankAcNo.isNotEmpty) _buildRow('Account No', _partner!.bankAcNo),
                               if (_partner!.bankIfscCode.isNotEmpty) _buildRow('IFSC Code', _partner!.bankIfscCode),
-                              if (_partner!.bankAcType.isNotEmpty) _buildRow('Account Type', _toTitleCase(_partner!.bankAcType)),
+                              if (_partner!.bankName.isNotEmpty) _buildRow('Bank Name', _partner!.bankName),
+                              _buildBranchRow(_partner!.bankBranch, _partner!.bankCity),
                             ]),
                           ],
                         ),
@@ -334,6 +337,13 @@ class _PartnerDetailScreenState extends ConsumerState<PartnerDetailScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildBranchRow(String branch, String city) {
+    final parts = <String>[];
+    if (branch.isNotEmpty) parts.add(branch);
+    if (city.isNotEmpty) parts.add(city);
+    return parts.isEmpty ? const SizedBox.shrink() : _buildRow('Branch', parts.join(', '));
   }
 
   String _toTitleCase(String text) {

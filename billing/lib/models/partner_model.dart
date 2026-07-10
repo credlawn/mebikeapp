@@ -14,6 +14,7 @@ class Partner {
   final String billingAddress;
   final String billingLandmark;
   final String billingCity;
+  final String billingDistrict;
   final String billingState;
   final String billingPincode;
   
@@ -23,6 +24,7 @@ class Partner {
   final String shippingAddress;
   final String shippingLandmark;
   final String shippingCity;
+  final String shippingDistrict;
   final String shippingState;
   final String shippingPincode;
 
@@ -36,6 +38,8 @@ class Partner {
   final String bankAcNo;
   final String bankIfscCode;
   final String bankAcType; // saving, current
+  final String bankBranch;
+  final String bankCity;
 
   final String partnerStatus;
   final DateTime created;
@@ -57,6 +61,7 @@ class Partner {
     required this.billingAddress,
     required this.billingLandmark,
     required this.billingCity,
+    required this.billingDistrict,
     required this.billingState,
     required this.billingPincode,
     required this.hasDifferentShippingAddress,
@@ -64,6 +69,7 @@ class Partner {
     required this.shippingAddress,
     required this.shippingLandmark,
     required this.shippingCity,
+    required this.shippingDistrict,
     required this.shippingState,
     required this.shippingPincode,
     required this.panNo,
@@ -73,6 +79,8 @@ class Partner {
     required this.bankAcNo,
     required this.bankIfscCode,
     required this.bankAcType,
+    required this.bankBranch,
+    required this.bankCity,
     required this.partnerStatus,
     required this.created,
     required this.updated,
@@ -96,6 +104,7 @@ class Partner {
       billingAddress: json['billing_address'] ?? '',
       billingLandmark: json['billing_landmark'] ?? '',
       billingCity: json['billing_city'] ?? '',
+      billingDistrict: json['billing_district'] ?? '',
       billingState: json['billing_state'] ?? '',
       billingPincode: json['billing_pincode'] ?? '',
       
@@ -104,6 +113,7 @@ class Partner {
       shippingAddress: json['shipping_address'] ?? '',
       shippingLandmark: json['shipping_landmark'] ?? '',
       shippingCity: json['shipping_city'] ?? '',
+      shippingDistrict: json['shipping_district'] ?? '',
       shippingState: json['shipping_state'] ?? '',
       shippingPincode: json['shipping_pincode'] ?? '',
       
@@ -115,6 +125,8 @@ class Partner {
       bankAcNo: json['bank_ac_no'] ?? '',
       bankIfscCode: json['bank_ifsc_code'] ?? '',
       bankAcType: json['bank_ac_type'] ?? 'saving',
+      bankBranch: json['bank_branch'] ?? '',
+      bankCity: json['bank_city'] ?? '',
       
       partnerStatus: json['partner_status'] ?? '',
       created: DateTime.parse(json['created']),
@@ -140,6 +152,7 @@ class Partner {
       'billing_address': billingAddress,
       'billing_landmark': billingLandmark,
       'billing_city': billingCity,
+      'billing_district': billingDistrict,
       'billing_state': billingState,
       'billing_pincode': billingPincode,
       'has_different_shipping_address': hasDifferentShippingAddress,
@@ -147,6 +160,7 @@ class Partner {
       'shipping_address': shippingAddress,
       'shipping_landmark': shippingLandmark,
       'shipping_city': shippingCity,
+      'shipping_district': shippingDistrict,
       'shipping_state': shippingState,
       'shipping_pincode': shippingPincode,
       'pan_no': panNo,
@@ -156,6 +170,8 @@ class Partner {
       'bank_ac_no': bankAcNo,
       'bank_ifsc_code': bankIfscCode,
       'bank_ac_type': bankAcType,
+      'bank_branch': bankBranch,
+      'bank_city': bankCity,
       'partner_status': partnerStatus,
       'partner_onboarding_date': onboardingDate?.toIso8601String(),
       'partner_offboarding_date': offboardingDate?.toIso8601String(),

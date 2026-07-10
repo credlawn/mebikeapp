@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:pocketbase/pocketbase.dart';
 import '../../providers/partner_provider.dart';
@@ -40,12 +42,14 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   final _billingAddressController = TextEditingController();
   final _billingLandmarkController = TextEditingController();
   final _billingCityController = TextEditingController();
+  final _billingDistrictController = TextEditingController();
   final _billingStateController = TextEditingController();
   final _billingPincodeController = TextEditingController();
   final _shippingBusinessController = TextEditingController();
   final _shippingAddressController = TextEditingController();
   final _shippingLandmarkController = TextEditingController();
   final _shippingCityController = TextEditingController();
+  final _shippingDistrictController = TextEditingController();
   final _shippingStateController = TextEditingController();
   final _shippingPincodeController = TextEditingController();
   final _panController = TextEditingController();
@@ -63,6 +67,15 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   String _partnerCode = '';
   String _partnerStatus = 'draft';
   bool _isMismatchDialogShowing = false;
+  String _bankBranch = '';
+  String _bankCity = '';
+  bool _isFetchingIfsc = false;
+  List<String> _billingStateSuggestions = [];
+  List<String> _shippingStateSuggestions = [];
+  final _billingStateFocus = FocusNode();
+  final _shippingStateFocus = FocusNode();
+  bool _isFetchingBillingPincode = false;
+  bool _isFetchingShippingPincode = false;
 
   @override
   void initState() {
@@ -210,6 +223,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       _billingAddressController.text = data['billing_address'] ?? '';
       _billingLandmarkController.text = data['billing_landmark'] ?? '';
       _billingCityController.text = data['billing_city'] ?? '';
+      _billingDistrictController.text = data['billing_district'] ?? '';
       _billingStateController.text = data['billing_state'] ?? '';
       _billingPincodeController.text = data['billing_pincode'] ?? '';
       
@@ -218,6 +232,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       _shippingAddressController.text = data['shipping_address'] ?? '';
       _shippingLandmarkController.text = data['shipping_landmark'] ?? '';
       _shippingCityController.text = data['shipping_city'] ?? '';
+      _shippingDistrictController.text = data['shipping_district'] ?? '';
       _shippingStateController.text = data['shipping_state'] ?? '';
       
       _panController.text = data['pan_no'] ?? '';
@@ -225,6 +240,8 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       _bankNameController.text = data['bank_name'] ?? '';
       _bankAcController.text = data['bank_ac_no'] ?? '';
       _bankIfscController.text = data['bank_ifsc_code'] ?? '';
+      _bankBranch = data['bank_branch'] ?? '';
+      _bankCity = data['bank_city'] ?? '';
       
       _partnerCode = data['partner_code']?.toString() ?? '';
       _partnerStatus = data['partner_status']?.toString() ?? 'active';
@@ -333,6 +350,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       'billing_address': _billingAddressController.text.trim(),
       'billing_landmark': _billingLandmarkController.text.trim(),
       'billing_city': _billingCityController.text.trim(),
+      'billing_district': _billingDistrictController.text.trim(),
       'billing_state': _billingStateController.text.trim(),
       'billing_pincode': _billingPincodeController.text.trim(),
       'has_different_shipping_address': _hasDifferentShipping,
@@ -340,15 +358,18 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       'shipping_address': _shippingAddressController.text.trim(),
       'shipping_landmark': _shippingLandmarkController.text.trim(),
       'shipping_city': _shippingCityController.text.trim(),
+      'shipping_district': _shippingDistrictController.text.trim(),
       'shipping_state': _shippingStateController.text.trim(),
       'shipping_pincode': _shippingPincodeController.text.trim(),
       'pan_no': _panController.text.trim(),
       'gst_no': _gstController.text.trim(),
       'gst_filing_frequency': _gstFrequency,
-      'bank_name': _bankNameController.text.trim(),
-      'bank_ac_no': _bankAcController.text.trim(),
       'bank_ifsc_code': _bankIfscController.text.trim(),
-      'bank_ac_type': _bankAcType,
+      'bank_name': _bankIfscController.text.trim().isEmpty ? '' : _bankNameController.text.trim(),
+      'bank_ac_no': _bankIfscController.text.trim().isEmpty ? '' : _bankAcController.text.trim(),
+      'bank_ac_type': _bankIfscController.text.trim().isEmpty ? '' : _bankAcType,
+      'bank_branch': _bankIfscController.text.trim().isEmpty ? '' : _bankBranch,
+      'bank_city': _bankIfscController.text.trim().isEmpty ? '' : _bankCity,
       'partner_onboarding_date': AppDateUtils.toServerDate(_onboardingDate).toIso8601String(),
       'partner_status': effectiveStatus,
     };
@@ -428,6 +449,83 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     }
   }
 
+  Future<void> _fetchPincodeDetails(TextEditingController pincodeCtrl, TextEditingController cityCtrl, TextEditingController districtCtrl, TextEditingController stateCtrl) async {
+    final pincode = pincodeCtrl.text.trim();
+    if (pincode.length != 6) {
+      if (mounted) AppSnackBars.showError(context, 'Enter a valid 6-digit pincode');
+      return;
+    }
+    setState(() {});
+    try {
+      final res = await http.get(Uri.parse('https://api.postalpincode.in/pincode/$pincode')).timeout(const Duration(seconds: 10));
+      if (!mounted) return;
+      final data = (jsonDecode(res.body) as List).first as Map<String, dynamic>;
+      if (data['Status'] != 'Success') {
+        if (mounted) AppSnackBars.showError(context, 'Pincode not found');
+        return;
+      }
+      final offices = data['PostOffice'] as List;
+      if (offices.isEmpty) return;
+      final first = offices.first as Map<String, dynamic>;
+      final block = first['Block'] as String? ?? '';
+      final district = first['District'] as String? ?? '';
+      final state = first['State'] as String? ?? '';
+
+      if (cityCtrl.text.isEmpty && block.isNotEmpty) cityCtrl.text = block;
+      if (districtCtrl.text.isEmpty && district.isNotEmpty) districtCtrl.text = district;
+      if (stateCtrl.text.isEmpty && state.isNotEmpty) stateCtrl.text = state;
+      setState(() {});
+    } catch (_) {
+      if (mounted) AppSnackBars.showError(context, 'Cannot reach server');
+    } finally {
+      if (mounted) setState(() {});
+    }
+  }
+
+  Widget _buildPincodeField(String label, TextEditingController controller, IconData icon, String? errorMsg,
+      {required bool isFetching, required VoidCallback onSearch}) {
+    return _buildField(label, controller, icon, errorMsg, keyboardType: TextInputType.number, suffix: isFetching
+        ? const Padding(
+            padding: EdgeInsets.all(12),
+            child: SizedBox(width: 6, height: 6, child: CircularProgressIndicator(strokeWidth: 1, color: AppColors.primary)),
+          )
+        : SizedBox(
+            width: 36,
+            height: 24,
+            child: IconButton(
+              icon: const Icon(Icons.search_rounded, size: 20),
+              onPressed: onSearch,
+              padding: EdgeInsets.zero,
+            ),
+          ));
+  }
+
+  Future<void> _fetchBankDetails() async {
+    final ifsc = _bankIfscController.text.trim();
+    if (ifsc.length < 8) {
+      if (mounted) AppSnackBars.showError(context, 'Enter a valid IFSC code');
+      return;
+    }
+    setState(() => _isFetchingIfsc = true);
+    try {
+      final res = await http.get(Uri.parse('https://ifsc.razorpay.com/$ifsc')).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 404) {
+        if (mounted) AppSnackBars.showError(context, 'IFSC code not found');
+        return;
+      }
+      if (!mounted) return;
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      _bankNameController.text = data['BANK'] ?? '';
+      _bankBranch = data['BRANCH'] ?? '';
+      _bankCity = data['CITY'] ?? '';
+      setState(() {});
+    } catch (_) {
+      if (mounted) AppSnackBars.showError(context, 'Cannot reach server');
+    } finally {
+      if (mounted) setState(() => _isFetchingIfsc = false);
+    }
+  }
+
   Widget _buildSyncIndicator() {
     switch (_syncState) {
       case _SyncState.syncing:
@@ -448,6 +546,13 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   String _toTitleCase(String text) {
     if (text.isEmpty) return text;
     return text[0].toUpperCase() + text.substring(1).toLowerCase();
+  }
+
+  String _toProperCase(String text) {
+    return text.split(' ').map((w) {
+      if (w.isEmpty) return w;
+      return w[0].toUpperCase() + w.substring(1).toLowerCase();
+    }).join(' ');
   }
 
   @override
@@ -495,7 +600,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
             const SizedBox(height: 24),
             _buildDatePicker(),
             const SizedBox(height: 16),
-            _buildField('Partner Name *', _nameController, Icons.storefront_outlined, 'Required'),
+            _buildField('Partner Name *', _nameController, Icons.storefront_outlined, 'Required', textCapitalization: TextCapitalization.words),
             const SizedBox(height: 16),
             _buildField('Email Address *', _emailController, Icons.mail_outline_rounded, 'Required', keyboardType: TextInputType.emailAddress),
             const SizedBox(height: 16),
@@ -538,7 +643,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
           children: [
             _buildStepHeader('Contact Details', 'Person responsible for communication'),
             const SizedBox(height: 24),
-            _buildField('Key Person Name *', _personController, Icons.person_outline_rounded, 'Required'),
+            _buildField('Key Person Name *', _personController, Icons.person_outline_rounded, 'Required', textCapitalization: TextCapitalization.words),
             const SizedBox(height: 16),
             _buildField('Mobile Number *', _mobileController, Icons.phone_android_outlined, 'Required', keyboardType: TextInputType.phone),
           ],
@@ -549,19 +654,24 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
           children: [
             _buildStepHeader('Billing Address', 'Registered location for invoices'),
             const SizedBox(height: 24),
-            _buildField('Street Address *', _billingAddressController, Icons.location_on_outlined, 'Required', maxLines: 2),
+            _buildField('Street Address *', _billingAddressController, Icons.location_on_outlined, 'Required', maxLines: 2, textCapitalization: TextCapitalization.words),
             const SizedBox(height: 16),
-            _buildField('Landmark', _billingLandmarkController, Icons.near_me_outlined, null),
+            _buildField('Landmark', _billingLandmarkController, Icons.near_me_outlined, null, textCapitalization: TextCapitalization.words),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: _buildField('City *', _billingCityController, Icons.apartment_outlined, 'Required')),
-                const SizedBox(width: 12),
-                Expanded(child: _buildField('Pincode *', _billingPincodeController, Icons.pin_drop_outlined, 'Required', keyboardType: TextInputType.number)),
-              ],
-            ),
+            _buildPincodeField('Pincode *', _billingPincodeController, Icons.pin_drop_outlined, 'Required',
+                isFetching: _isFetchingBillingPincode,
+                onSearch: () {
+                  setState(() => _isFetchingBillingPincode = true);
+                  _fetchPincodeDetails(_billingPincodeController, _billingCityController, _billingDistrictController, _billingStateController).then((_) {
+                    if (mounted) setState(() => _isFetchingBillingPincode = false);
+                  });
+                }),
             const SizedBox(height: 16),
-            _buildField('State *', _billingStateController, Icons.map_outlined, 'Required'),
+            _buildField('City *', _billingCityController, Icons.apartment_outlined, 'Required', textCapitalization: TextCapitalization.words),
+            const SizedBox(height: 16),
+            _buildField('District *', _billingDistrictController, Icons.map_outlined, 'Required', textCapitalization: TextCapitalization.words),
+            const SizedBox(height: 16),
+            _buildStateField('State *', _billingStateController, Icons.map_outlined, 'Required', suggestions: _billingStateSuggestions, onSuggest: (v) => setState(() => _billingStateSuggestions = v), focusNode: _billingStateFocus),
             const SizedBox(height: 32),
             SwitchListTile(
               title: Text('Different Shipping Address?', style: AppTypography.h3),
@@ -574,21 +684,26 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
               const SizedBox(height: 16),
               _buildStepHeader('Shipping Address', 'Delivery location'),
               const SizedBox(height: 16),
-              _buildField('Business Name', _shippingBusinessController, Icons.business_outlined, null),
+              _buildField('Business Name', _shippingBusinessController, Icons.business_outlined, null, textCapitalization: TextCapitalization.words),
               const SizedBox(height: 16),
-              _buildField('Street Address', _shippingAddressController, Icons.local_shipping_outlined, null, maxLines: 2),
+              _buildField('Street Address', _shippingAddressController, Icons.local_shipping_outlined, null, maxLines: 2, textCapitalization: TextCapitalization.words),
               const SizedBox(height: 16),
-              _buildField('Landmark', _shippingLandmarkController, Icons.near_me_outlined, null),
+              _buildField('Landmark', _shippingLandmarkController, Icons.near_me_outlined, null, textCapitalization: TextCapitalization.words),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(child: _buildField('City', _shippingCityController, Icons.apartment_outlined, null)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildField('Pincode', _shippingPincodeController, Icons.pin_drop_outlined, null, keyboardType: TextInputType.number)),
-                ],
-              ),
+              _buildPincodeField('Pincode', _shippingPincodeController, Icons.pin_drop_outlined, null,
+                  isFetching: _isFetchingShippingPincode,
+                  onSearch: () {
+                    setState(() => _isFetchingShippingPincode = true);
+                    _fetchPincodeDetails(_shippingPincodeController, _shippingCityController, _shippingDistrictController, _shippingStateController).then((_) {
+                      if (mounted) setState(() => _isFetchingShippingPincode = false);
+                    });
+                  }),
               const SizedBox(height: 16),
-              _buildField('State', _shippingStateController, Icons.map_outlined, null),
+              _buildField('City', _shippingCityController, Icons.apartment_outlined, null, textCapitalization: TextCapitalization.words),
+              const SizedBox(height: 16),
+              _buildField('District', _shippingDistrictController, Icons.map_outlined, null, textCapitalization: TextCapitalization.words),
+              const SizedBox(height: 16),
+              _buildStateField('State', _shippingStateController, Icons.map_outlined, null, suggestions: _shippingStateSuggestions, onSuggest: (v) => setState(() => _shippingStateSuggestions = v), focusNode: _shippingStateFocus),
             ],
           ],
         );
@@ -614,7 +729,30 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
             const SizedBox(height: 16),
             _buildField('Account Number', _bankAcController, Icons.format_list_numbered_rtl_outlined, null),
             const SizedBox(height: 16),
-            _buildField('IFSC Code', _bankIfscController, Icons.code_rounded, null),
+            _buildField('IFSC Code', _bankIfscController, Icons.code_rounded, null, suffix: _isFetchingIfsc
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: SizedBox(width: 6, height: 6, child: CircularProgressIndicator(strokeWidth: 1, color: AppColors.primary)),
+                  )
+                : SizedBox(
+                    width: 36,
+                    height: 24,
+                    child: IconButton(
+                      icon: const Icon(Icons.search_rounded, size: 20),
+                      onPressed: _fetchBankDetails,
+                      padding: EdgeInsets.zero,
+                    ),
+                  )),
+            if (_bankBranch.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Text(
+                  '${_bankNameController.text}, ${_toProperCase(_bankBranch)}, ${_toProperCase(_bankCity)}',
+                  style: AppTypography.bodySmall.copyWith(fontSize: 11, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
           ],
         );
       default:
@@ -680,10 +818,100 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller, IconData icon, String? errorMsg, {TextInputType keyboardType = TextInputType.text, int maxLines = 1, List<TextInputFormatter>? formatters}) {
+  static const _indianStates = [
+    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
+    'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+    'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
+    'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+    'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+    'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu',
+    'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
+  ];
+
+  Widget _buildStateField(String label, TextEditingController controller, IconData icon, String? errorMsg,
+      {required List<String> suggestions, required void Function(List<String>) onSuggest, required FocusNode focusNode}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextFormField(
+          controller: controller,
+          focusNode: focusNode,
+          textCapitalization: TextCapitalization.words,
+          style: AppTypography.input,
+          decoration: InputDecoration(
+            labelText: label,
+            labelStyle: AppTypography.bodySmall,
+            prefixIcon: Icon(icon, size: 18, color: AppColors.textSecondary),
+            filled: true,
+            fillColor: AppColors.background,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            suffixIcon: controller.text.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear_rounded, size: 18),
+                    onPressed: () {
+                      controller.clear();
+                      onSuggest([]);
+                    },
+                  )
+                : null,
+          ),
+          validator: (v) {
+            if (v == null || v.isEmpty) return errorMsg;
+            if (!_indianStates.contains(v.trim())) return 'Select a valid state from the list';
+            return null;
+          },
+          onChanged: (v) {
+            if (v.isEmpty) {
+              onSuggest([]);
+            } else {
+              final input = v.toLowerCase();
+              onSuggest(_indianStates.where((s) => s.toLowerCase().contains(input)).toList());
+            }
+          },
+        ),
+        if (suggestions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 4),
+            constraints: const BoxConstraints(maxHeight: 180),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.border),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2))],
+            ),
+            child: ListView.separated(
+              padding: EdgeInsets.zero,
+              shrinkWrap: true,
+              itemCount: suggestions.length,
+              separatorBuilder: (_, _) => const Divider(height: 1, indent: 16),
+              itemBuilder: (_, i) {
+                final option = suggestions[i];
+                return ListTile(
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  title: Text(option, style: AppTypography.bodyMedium.copyWith(fontSize: 13)),
+                  onTap: () {
+                    controller.text = option;
+                    controller.selection = TextSelection.collapsed(offset: option.length);
+                    onSuggest([]);
+                    focusNode.unfocus();
+                  },
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildField(String label, TextEditingController controller, IconData icon, String? errorMsg, {TextInputType keyboardType = TextInputType.text, int maxLines = 1, List<TextInputFormatter>? formatters, Widget? suffix, TextCapitalization textCapitalization = TextCapitalization.none}) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      textCapitalization: textCapitalization,
       maxLines: maxLines,
       inputFormatters: formatters,
       style: AppTypography.input,
@@ -691,6 +919,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
         labelText: label,
         labelStyle: AppTypography.bodySmall,
         prefixIcon: Icon(icon, size: 18, color: AppColors.textSecondary),
+        suffix: suffix,
         filled: true,
         fillColor: AppColors.background,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
@@ -780,14 +1009,18 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     _billingAddressController.dispose();
     _billingLandmarkController.dispose();
     _billingCityController.dispose();
+    _billingDistrictController.dispose();
     _billingStateController.dispose();
     _billingPincodeController.dispose();
     _shippingBusinessController.dispose();
     _shippingAddressController.dispose();
     _shippingLandmarkController.dispose();
     _shippingCityController.dispose();
+    _shippingDistrictController.dispose();
     _shippingStateController.dispose();
     _shippingPincodeController.dispose();
+    _billingStateFocus.dispose();
+    _shippingStateFocus.dispose();
     _gstController.removeListener(_onGstChanged);
     _panController.removeListener(_onPanChanged);
     _panController.dispose();
