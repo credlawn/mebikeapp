@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../models/partner_model.dart';
 import '../../pb_service.dart';
 import '../../providers/partner_provider.dart';
+import '../../services/date_utils.dart';
 import '../../theme/app_snackbars.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
@@ -51,9 +52,13 @@ class _PartnerDetailScreenState extends ConsumerState<PartnerDetailScreen> {
 
     setState(() => _isLoading = true);
     try {
+      final updateBody = <String, dynamic>{
+        'partner_status': newStatus,
+        'partner_offboarding_date': isMakingActive ? '' : AppDateUtils.toServerDate(DateTime.now()).toIso8601String(),
+      };
       await PbService().pb.collection('partner').update(
         widget.partnerId,
-        body: {'partner_status': newStatus},
+        body: updateBody,
       ).timeout(const Duration(seconds: 15));
 
       if (mounted) {
