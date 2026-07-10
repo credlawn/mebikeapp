@@ -415,7 +415,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
 
       if (isFinal) {
         if (mounted) {
-          AppSnackBars.showSuccess(context, 'Partner Onboarded: $partnerCode');
+          AppSnackBars.showSuccess(context, widget.isEditing ? 'Changes Applied' : 'Partner Onboarded: $partnerCode');
           Navigator.of(context).pop();
         }
         WidgetsBinding.instance.addPostFrameCallback((_) => ref.invalidate(allPartnersProvider));
