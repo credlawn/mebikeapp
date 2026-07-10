@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pocketbase/pocketbase.dart';
@@ -56,11 +57,12 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   bool _hasDifferentShipping = false;
   String _partnerType = 'dealer';
   String _entityType = 'proprietor';
-  String _bankAcType = 'saving';
+  String _bankAcType = 'current';
   String _gstFrequency = 'monthly';
   DateTime _onboardingDate = DateTime.now();
   String _partnerCode = '';
   String _partnerStatus = 'draft';
+  bool _isMismatchDialogShowing = false;
 
   @override
   void initState() {
@@ -68,6 +70,122 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     if (widget.draftId != null) {
       _loadFromServer(widget.draftId!);
     }
+    _gstController.addListener(_onGstChanged);
+    _panController.addListener(_onPanChanged);
+  }
+
+  String? _extractPanFromGst(String gst) {
+    if (gst.length == 15) {
+      final pan = gst.substring(2, 12);
+      if (pan.length == 10) return pan;
+    }
+    return null;
+  }
+
+  void _onGstChanged() {
+    final gst = _gstController.text;
+    final pan = _panController.text;
+    final extracted = _extractPanFromGst(gst);
+
+    if (extracted == null) return;
+
+    if (pan.isEmpty) {
+      _panController.text = extracted;
+    } else if (pan != extracted) {
+      _maybeShowMismatchDialog(extracted);
+    }
+  }
+
+  void _onPanChanged() {
+    final pan = _panController.text;
+    if (pan.length != 10) return;
+    final gst = _gstController.text;
+    final extracted = _extractPanFromGst(gst);
+    if (extracted != null && pan != extracted) {
+      _maybeShowMismatchDialog(extracted);
+    }
+  }
+
+  void _maybeShowMismatchDialog(String correctPan) {
+    if (_isMismatchDialogShowing || !mounted) return;
+    _isMismatchDialogShowing = true;
+    showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 28),
+            ),
+            const SizedBox(height: 20),
+            Text('Mismatch in PAN & GST', style: AppTypography.h2.copyWith(fontSize: 18)),
+            const SizedBox(height: 12),
+            Text(
+              'The PAN number does not match the PAN extracted from the GST number.',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    _isMismatchDialogShowing = false;
+                    Navigator.of(ctx).pop();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary, width: 1.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text('Edit Manually', style: AppTypography.button.copyWith(color: AppColors.primary)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    _isMismatchDialogShowing = false;
+                    _panController.text = correctPan;
+                    Navigator.of(ctx).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text('Auto Correct', style: AppTypography.button.copyWith(color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ).then((_) {
+      _isMismatchDialogShowing = false;
+    });
   }
 
   Future<void> _loadFromServer(String id) async {
@@ -119,131 +237,6 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
         _onboardingDate = DateTime.parse(data['partner_onboarding_date']);
       }
     });
-  }
-
-  Future<void> _handleClear() async {
-    final confirmed = await _showClearConfirmDialog();
-    if (confirmed != true) return;
-
-    if (!widget.isEditing) {
-      try {
-        if (_draftId != null) {
-          await PbService().pb.collection('partner').delete(_draftId!);
-        }
-      } catch (_) {}
-    }
-    if (!mounted) return;
-    setState(() {
-      _draftId = widget.isEditing ? _draftId : null;
-      _currentStep = 0;
-      _nameController.clear();
-      _emailController.clear();
-      _mobileController.clear();
-      _personController.clear();
-      _billingAddressController.clear();
-      _billingLandmarkController.clear();
-      _billingCityController.clear();
-      _billingStateController.clear();
-      _billingPincodeController.clear();
-      _shippingBusinessController.clear();
-      _shippingAddressController.clear();
-      _shippingLandmarkController.clear();
-      _shippingCityController.clear();
-      _shippingStateController.clear();
-      _shippingPincodeController.clear();
-      _panController.clear();
-      _gstController.clear();
-      _bankNameController.clear();
-      _bankAcController.clear();
-      _bankIfscController.clear();
-      _onboardingDate = DateTime.now();
-    });
-    if (mounted) AppSnackBars.showSuccess(context, widget.isEditing ? 'Form reset' : 'Form cleared');
-  }
-
-  Future<bool?> _showClearConfirmDialog() {
-    final isEditing = widget.isEditing;
-    final title = isEditing ? 'Reset Form?' : 'Clear Form?';
-    final message = isEditing
-        ? 'All changes will be lost and form fields will be reset to their initial values.'
-        : 'This will permanently delete the saved draft from the server. You will lose all entered data.';
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.delete_outline_rounded,
-                color: AppColors.error,
-                size: 28,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(title, style: AppTypography.h2.copyWith(fontSize: 18)),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              style: AppTypography.bodySmall.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-                height: 1.4,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-        actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary, width: 1.2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: Text('Cancel', style: AppTypography.button.copyWith(color: AppColors.primary)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(ctx).pop(true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.error,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: Text(isEditing ? 'Reset' : 'Clear', style: AppTypography.button.copyWith(color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
   }
 
   Future<String?> _showFinishConfirmDialog() {
@@ -368,6 +361,16 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   }
 
   Future<void> _handleSaveData({required bool isFinal, bool advanceStep = false, String status = 'draft'}) async {
+    if (isFinal) {
+      final gst = _gstController.text;
+      final pan = _panController.text;
+      final extracted = _extractPanFromGst(gst);
+      if (extracted != null && pan.isNotEmpty && pan != extracted) {
+        if (mounted) AppSnackBars.showError(context, 'PAN & GST number mismatch. Please correct or clear the PAN field.');
+        return;
+      }
+    }
+
     setState(() {
       _isLoading = true;
       _syncState = _SyncState.syncing;
@@ -455,8 +458,14 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
         title: Text(widget.isEditing ? 'Edit Partner' : 'Partner Onboarding'),
         elevation: 0,
         actions: [
-          _buildSyncIndicator(),
-          const SizedBox(width: 16),
+          GestureDetector(
+            onTap: _isLoading ? null : () => _handleSaveData(isFinal: false),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: _buildSyncIndicator(),
+            ),
+          ),
+          const SizedBox(width: 24),
         ],
       ),
       body: Column(
@@ -589,59 +598,23 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
           children: [
             _buildStepHeader('Finance & Banking', 'Tax compliance and bank details'),
             const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(child: _buildField('GST No', _gstController, Icons.receipt_outlined, null)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppPickerField(
-                    label: 'Filing',
-                    value: _toTitleCase(_gstFrequency),
-                    icon: Icons.event_repeat_outlined,
-                    onTap: () async {
-                      final result = await AppPickers.showSelectionSheet<String>(
-                        context: context,
-                        title: 'GST Filing Frequency',
-                        items: ['monthly', 'quarterly'],
-                        labelBuilder: _toTitleCase,
-                        selectedValue: _gstFrequency,
-                      );
-                      if (result != null) setState(() => _gstFrequency = result);
-                    },
-                  ),
-                ),
-              ],
-            ),
+            _buildField('GST No', _gstController, Icons.receipt_outlined, null, formatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+              TextInputFormatter.withFunction((o, n) => n.copyWith(text: n.text.toUpperCase())),
+              LengthLimitingTextInputFormatter(15),
+            ]),
             const SizedBox(height: 16),
-            _buildField('PAN No', _panController, Icons.credit_card_outlined, null),
+            _buildField('PAN No', _panController, Icons.credit_card_outlined, null, formatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+              TextInputFormatter.withFunction((o, n) => n.copyWith(text: n.text.toUpperCase())),
+              LengthLimitingTextInputFormatter(10),
+            ]),
             const SizedBox(height: 24),
             _buildField('Bank Name', _bankNameController, Icons.account_balance_outlined, null),
             const SizedBox(height: 16),
             _buildField('Account Number', _bankAcController, Icons.format_list_numbered_rtl_outlined, null),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: _buildField('IFSC Code', _bankIfscController, Icons.code_rounded, null)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppPickerField(
-                    label: 'A/c Type',
-                    value: _toTitleCase(_bankAcType),
-                    icon: Icons.account_box_outlined,
-                    onTap: () async {
-                      final result = await AppPickers.showSelectionSheet<String>(
-                        context: context,
-                        title: 'Select Account Type',
-                        items: ['saving', 'current'],
-                        labelBuilder: _toTitleCase,
-                        selectedValue: _bankAcType,
-                      );
-                      if (result != null) setState(() => _bankAcType = result);
-                    },
-                  ),
-                ),
-              ],
-            ),
+            _buildField('IFSC Code', _bankIfscController, Icons.code_rounded, null),
           ],
         );
       default:
@@ -661,23 +634,13 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
           children: [
             Expanded(
               child: _CompactButton(
-                text: 'CLEAR',
-                onPressed: _handleClear,
-                color: Colors.redAccent,
+                text: 'BACK',
+                onPressed: _currentStep > 0 ? () => setState(() => _currentStep--) : null,
+                color: AppColors.textMuted,
                 isOutline: true,
               ),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _CompactButton(
-                text: 'SAVE DATA',
-                onPressed: () => _handleSaveData(isFinal: false),
-                color: AppColors.primary,
-                isOutline: true,
-                isLoading: _isLoading,
-              ),
-            ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 96),
             Expanded(
               child: _CompactButton(
                 text: _currentStep == 3 ? (widget.isEditing ? 'SAVE' : 'FINISH') : 'CONTINUE',
@@ -717,11 +680,12 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller, IconData icon, String? errorMsg, {TextInputType keyboardType = TextInputType.text, int maxLines = 1}) {
+  Widget _buildField(String label, TextEditingController controller, IconData icon, String? errorMsg, {TextInputType keyboardType = TextInputType.text, int maxLines = 1, List<TextInputFormatter>? formatters}) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      inputFormatters: formatters,
       style: AppTypography.input,
       decoration: InputDecoration(
         labelText: label,
@@ -824,6 +788,8 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     _shippingCityController.dispose();
     _shippingStateController.dispose();
     _shippingPincodeController.dispose();
+    _gstController.removeListener(_onGstChanged);
+    _panController.removeListener(_onPanChanged);
     _panController.dispose();
     _gstController.dispose();
     _bankNameController.dispose();
@@ -835,7 +801,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
 
 class _CompactButton extends StatelessWidget {
   final String text;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final Color color;
   final bool isOutline;
   final bool isLoading;
@@ -854,7 +820,7 @@ class _CompactButton extends StatelessWidget {
       height: 40,
       child: isOutline
           ? OutlinedButton(
-              onPressed: isLoading ? null : onPressed,
+              onPressed: (isLoading || onPressed == null) ? null : onPressed,
               style: OutlinedButton.styleFrom(
                 padding: EdgeInsets.zero,
                 side: BorderSide(color: color, width: 1.2),
@@ -866,7 +832,7 @@ class _CompactButton extends StatelessWidget {
                   : Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
             )
           : ElevatedButton(
-              onPressed: isLoading ? null : onPressed,
+              onPressed: (isLoading || onPressed == null) ? null : onPressed,
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.zero,
                 backgroundColor: color,
