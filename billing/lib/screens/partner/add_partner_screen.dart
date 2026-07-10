@@ -12,8 +12,9 @@ import '../../services/date_utils.dart';
 
 class AddPartnerScreen extends ConsumerStatefulWidget {
   final String? draftId;
+  final bool isEditing;
 
-  const AddPartnerScreen({super.key, this.draftId});
+  const AddPartnerScreen({super.key, this.draftId, this.isEditing = false});
 
   @override
   ConsumerState<AddPartnerScreen> createState() => _AddPartnerScreenState();
@@ -58,6 +59,8 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   String _bankAcType = 'saving';
   String _gstFrequency = 'monthly';
   DateTime _onboardingDate = DateTime.now();
+  String _partnerCode = '';
+  String _partnerStatus = 'draft';
 
   @override
   void initState() {
@@ -105,6 +108,8 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       _bankAcController.text = data['bank_ac_no'] ?? '';
       _bankIfscController.text = data['bank_ifsc_code'] ?? '';
       
+      _partnerCode = data['partner_code']?.toString() ?? '';
+      _partnerStatus = data['partner_status']?.toString() ?? 'active';
       _partnerType = data['partner_type']?.toString().isEmpty ?? true ? 'dealer' : data['partner_type'];
       _entityType = data['entity_type']?.toString().isEmpty ?? true ? 'proprietor' : data['entity_type'];
       _bankAcType = data['bank_ac_type']?.toString().isEmpty ?? true ? 'saving' : data['bank_ac_type'];
@@ -120,14 +125,16 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     final confirmed = await _showClearConfirmDialog();
     if (confirmed != true) return;
 
-    try {
-      if (_draftId != null) {
-        await PbService().pb.collection('partner').delete(_draftId!);
-      }
-    } catch (_) {}
+    if (!widget.isEditing) {
+      try {
+        if (_draftId != null) {
+          await PbService().pb.collection('partner').delete(_draftId!);
+        }
+      } catch (_) {}
+    }
     if (!mounted) return;
     setState(() {
-      _draftId = null;
+      _draftId = widget.isEditing ? _draftId : null;
       _currentStep = 0;
       _nameController.clear();
       _emailController.clear();
@@ -151,10 +158,15 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       _bankIfscController.clear();
       _onboardingDate = DateTime.now();
     });
-    if (mounted) AppSnackBars.showSuccess(context, 'Form cleared');
+    if (mounted) AppSnackBars.showSuccess(context, widget.isEditing ? 'Form reset' : 'Form cleared');
   }
 
   Future<bool?> _showClearConfirmDialog() {
+    final isEditing = widget.isEditing;
+    final title = isEditing ? 'Reset Form?' : 'Clear Form?';
+    final message = isEditing
+        ? 'All changes will be lost and form fields will be reset to their initial values.'
+        : 'This will permanently delete the saved draft from the server. You will lose all entered data.';
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -180,10 +192,10 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            Text('Clear Form?', style: AppTypography.h2.copyWith(fontSize: 18)),
+            Text(title, style: AppTypography.h2.copyWith(fontSize: 18)),
             const SizedBox(height: 12),
             Text(
-              'This will permanently delete the saved draft from the server. You will lose all entered data.',
+              message,
               style: AppTypography.bodySmall.copyWith(
                 color: AppColors.textSecondary,
                 fontSize: 13,
@@ -224,7 +236,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: Text('Clear', style: AppTypography.button.copyWith(color: Colors.white)),
+                  child: Text(isEditing ? 'Reset' : 'Clear', style: AppTypography.button.copyWith(color: Colors.white)),
                 ),
               ),
             ],
@@ -315,9 +327,11 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   }
 
   Map<String, dynamic> _buildBody({String partnerCode = '', String status = 'draft'}) {
+    final effectiveCode = _partnerCode.isNotEmpty ? _partnerCode : partnerCode;
+    final effectiveStatus = _partnerCode.isNotEmpty ? _partnerStatus : status;
     return {
       'partner_name': _nameController.text.trim(),
-      'partner_code': partnerCode,
+      'partner_code': effectiveCode,
       'partner_type': _partnerType,
       'entity_type': _entityType,
       'key_person_name': _personController.text.trim(),
@@ -343,7 +357,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       'bank_ifsc_code': _bankIfscController.text.trim(),
       'bank_ac_type': _bankAcType,
       'partner_onboarding_date': AppDateUtils.toServerDate(_onboardingDate).toIso8601String(),
-      'partner_status': status,
+      'partner_status': effectiveStatus,
     };
   }
 
@@ -362,7 +376,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       final repo = ref.read(partnerRepositoryProvider);
       String partnerCode = '';
 
-      if (isFinal) {
+      if (isFinal && !widget.isEditing) {
         partnerCode = await repo.getNextPartnerCode().timeout(_timeout);
       }
 
@@ -438,7 +452,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Partner Onboarding'),
+        title: Text(widget.isEditing ? 'Edit Partner' : 'Partner Onboarding'),
         elevation: 0,
         actions: [
           _buildSyncIndicator(),
@@ -666,11 +680,13 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: _CompactButton(
-                text: _currentStep == 3 ? 'FINISH' : 'CONTINUE',
+                text: _currentStep == 3 ? (widget.isEditing ? 'SAVE' : 'FINISH') : 'CONTINUE',
                 onPressed: () async {
                   if (_formKey.currentState!.validate()) {
                     if (_currentStep < 3) {
                       _handleSaveData(isFinal: false, advanceStep: true);
+                    } else if (widget.isEditing) {
+                      _handleSaveData(isFinal: true);
                     } else {
                       final chosenStatus = await _showFinishConfirmDialog();
                       if (chosenStatus != null && mounted) {

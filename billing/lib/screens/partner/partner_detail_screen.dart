@@ -7,6 +7,7 @@ import '../../providers/partner_provider.dart';
 import '../../theme/app_snackbars.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
+import 'add_partner_screen.dart';
 
 class PartnerDetailScreen extends ConsumerStatefulWidget {
   final String partnerId;
@@ -154,14 +155,52 @@ class _PartnerDetailScreenState extends ConsumerState<PartnerDetailScreen> {
         actions: [
           if (_partner != null)
             GestureDetector(
+              onTap: () {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => AddPartnerScreen(draftId: widget.partnerId, isEditing: true)),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.textMuted.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: AppColors.textMuted,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Edit',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (_partner != null)
+            GestureDetector(
               onTap: _isLoading ? null : _toggleStatus,
               child: Container(
-                margin: const EdgeInsets.only(right: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                margin: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: _partner!.partnerStatus == 'active'
                       ? AppColors.success.withValues(alpha: 0.1)
-                      : AppColors.textMuted.withValues(alpha: 0.15),
+                      : AppColors.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -171,7 +210,7 @@ class _PartnerDetailScreenState extends ConsumerState<PartnerDetailScreen> {
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: _partner!.partnerStatus == 'active' ? AppColors.success : AppColors.textMuted,
+                        color: _partner!.partnerStatus == 'active' ? AppColors.success : AppColors.error,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -181,7 +220,7 @@ class _PartnerDetailScreenState extends ConsumerState<PartnerDetailScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: _partner!.partnerStatus == 'active' ? AppColors.success : AppColors.textMuted,
+                        color: _partner!.partnerStatus == 'active' ? AppColors.success : AppColors.error,
                       ),
                     ),
                   ],
@@ -203,7 +242,7 @@ class _PartnerDetailScreenState extends ConsumerState<PartnerDetailScreen> {
                           children: [
                             _buildSection('Business Profile', [
                               _buildRow('Partner Name', _partner!.partnerName),
-                              _buildRow('Partner Code', '#${_partner!.partnerCode}'),
+                              _buildRow('Partner Code', _partner!.partnerCode),
                               _buildRow('Partner Type', _toTitleCase(_partner!.partnerType)),
                               _buildRow('Entity Type', _toTitleCase(_partner!.entityType)),
                               _buildRow('Email', _partner!.email),

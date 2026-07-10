@@ -233,7 +233,7 @@ class _PartnerTile extends StatelessWidget {
                           ),
                           if (!isDraft)
                             Text(
-                              '#${partner.partnerCode}',
+                              partner.partnerCode,
                               style: AppTypography.bodySmall.copyWith(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.bold,
