@@ -72,6 +72,7 @@ class _InventoryMasterScreenState extends ConsumerState<InventoryMasterScreen> {
         ref.invalidate(allItemVariantsProvider);
     }
   }
+  
 
   String _getName(dynamic item) => item.name;
   String _getStatus(dynamic item) => item.status;
