@@ -63,9 +63,9 @@ class InventoryDetailScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             _buildSection('Pricing & Compliance', [
               if (item.hsnCode.isNotEmpty) _buildRow('HSN Code', item.hsnCode),
-              if (item.itemWeight > 0) _buildRow('Weight', '${item.itemWeight} kg'),
+              if (item.itemWeight > 0) _buildRow('Weight', '${item.itemWeight % 1 == 0 ? item.itemWeight.toInt() : item.itemWeight} kg'),
               if (item.itemMrp > 0) _buildRow('MRP', '₹${item.itemMrp.toStringAsFixed(0)}'),
-              if (item.gstSlab.isNotEmpty) _buildRow('GST Slab', item.gstSlab),
+              _buildRow('GST Slab', '${item.gstSlab}%'),
             ]),
             const SizedBox(height: 12),
             _buildSection('Status & Dates', [

@@ -11,7 +11,7 @@ class ItemList {
   final String hsnCode;
   final double itemWeight;
   final double itemMrp;
-  final String gstSlab;
+  final int gstSlab;
   final String status;
   final DateTime created;
   final DateTime updated;
@@ -29,7 +29,7 @@ class ItemList {
     this.hsnCode = '',
     this.itemWeight = 0,
     this.itemMrp = 0,
-    this.gstSlab = '',
+    this.gstSlab = 0,
     this.status = 'active',
     required this.created,
     required this.updated,
@@ -46,17 +46,17 @@ class ItemList {
       id: json['id'] ?? '',
       collectionId: json['collectionId'] ?? '',
       collectionName: json['collectionName'] ?? '',
-      itemFullName: json['item_full_name'] ?? '',
-      itemName: json['item_name'] ?? '',
-      itemCode: json['item_code'] ?? '',
+      itemFullName: (json['item_full_name'] ?? '').toString(),
+      itemName: (json['item_name'] ?? '').toString(),
+      itemCode: (json['item_code'] ?? '').toString(),
       itemTypeId: _resolveRelation(json['item_type']),
       itemColorId: _resolveRelation(json['item_color']),
       itemVariantId: _resolveRelation(json['item_variant']),
-      hsnCode: json['hsn_code'] ?? '',
-      itemWeight: (json['item_weight'] ?? 0).toDouble(),
-      itemMrp: (json['item_mrp'] ?? 0).toDouble(),
-      gstSlab: json['gst_slab'] ?? '',
-      status: json['status'] ?? 'active',
+      hsnCode: (json['hsn_code'] ?? '').toString(),
+      itemWeight: (json['item_weight'] is String ? double.tryParse(json['item_weight']) ?? 0 : (json['item_weight'] ?? 0)).toDouble(),
+      itemMrp: (json['item_mrp'] is String ? double.tryParse(json['item_mrp']) ?? 0 : (json['item_mrp'] ?? 0)).toDouble(),
+      gstSlab: (json['gst_slab'] ?? 0).toInt(),
+      status: (json['status'] ?? 'active').toString(),
       created: DateTime.parse(json['created']),
       updated: DateTime.parse(json['updated']),
     );
@@ -73,7 +73,7 @@ class ItemList {
       'hsn_code': hsnCode.isEmpty ? null : hsnCode,
       'item_weight': itemWeight,
       'item_mrp': itemMrp,
-      'gst_slab': gstSlab.isEmpty ? null : gstSlab,
+      'gst_slab': gstSlab,
       'status': status,
     };
   }

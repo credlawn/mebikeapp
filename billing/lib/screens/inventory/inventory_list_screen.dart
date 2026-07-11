@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../models/item_list_model.dart';
 import '../../providers/inventory_provider.dart';
 import '../../theme/colors.dart';
@@ -20,7 +19,6 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
   @override
   Widget build(BuildContext context) {
     final itemsAsync = ref.watch(allItemListProvider);
-    final dateFormat = DateFormat('dd MMM yyyy');
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -143,12 +141,21 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
                                             Row(
                                               children: [
                                                 Text(
-                                                  '₹${item.itemMrp.toStringAsFixed(0)}',
-                                                  style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
+                                                  '₹ ${item.itemMrp.toStringAsFixed(0)}',
+                                                  style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
                                                 ),
-                                                const SizedBox(width: 12),
+                                                const SizedBox(width: 8),
+                                                Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
+                                                const SizedBox(width: 8),
                                                 Text(
-                                                  dateFormat.format(item.created),
+                                                  '${item.itemWeight % 1 == 0 ? item.itemWeight.toInt() : item.itemWeight} kg',
+                                                  style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'GST ${item.gstSlab}%',
                                                   style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
                                                 ),
                                               ],

@@ -31,14 +31,15 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
   ItemTypeConfig? _typeConfig;
   Set<String> _selectedColorIds = {};
   Set<String> _selectedVariantIds = {};
-  String _gstSlab = '';
+  int? _gstSlab;
   bool _isLoading = false;
   bool _syncWeightMrp = true;
+  bool _itemNameLocked = false;
 
   final Map<String, TextEditingController> _weightControllers = {};
   final Map<String, TextEditingController> _mrpControllers = {};
 
-  static const _gstOptions = ['0%', '5%', '12%', '18%', '28%'];
+  static const _gstOptions = [0, 5, 12, 18, 28];
 
   @override
   void dispose() {
@@ -53,8 +54,16 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
     super.dispose();
   }
 
+  String _buildFullName(String itemName, String typeName, String colorName, String variantName) {
+    var name = '$itemName $typeName';
+    if (colorName.isNotEmpty) name += ' - $colorName';
+    if (variantName.isNotEmpty) name += ' - $variantName';
+    return name;
+  }
+
   List<_CombinationInfo> _computeCombinations(
     String itemName,
+    String typeName,
     List<ItemColor> selectedColors,
     List<ItemVariant> selectedVariants,
   ) {
@@ -62,7 +71,7 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
     final hasVariants = selectedVariants.isNotEmpty;
 
     if (!hasColors && !hasVariants) {
-      return [_CombinationInfo(key: 'base', name: itemName)];
+      return [_CombinationInfo(key: 'base', name: _buildFullName(itemName, typeName, '', ''))];
     }
 
     final result = <_CombinationInfo>[];
@@ -70,14 +79,14 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
       for (final color in selectedColors) {
         result.add(_CombinationInfo(
           key: 'c_${color.id}',
-          name: _buildFullName(itemName, color.name, ''),
+          name: _buildFullName(itemName, typeName, color.name, ''),
         ));
       }
     } else if (!hasColors && hasVariants) {
       for (final variant in selectedVariants) {
         result.add(_CombinationInfo(
           key: 'v_${variant.id}',
-          name: _buildFullName(itemName, '', variant.name),
+          name: _buildFullName(itemName, typeName, '', variant.name),
         ));
       }
     } else {
@@ -85,7 +94,7 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
         for (final variant in selectedVariants) {
           result.add(_CombinationInfo(
             key: 'c_${color.id}_v_${variant.id}',
-            name: _buildFullName(itemName, color.name, variant.name),
+            name: _buildFullName(itemName, typeName, color.name, variant.name),
           ));
         }
       }
@@ -130,14 +139,33 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
     });
   }
 
+  bool get _isAutoNameType => _selectedType != null && _selectedType!.name != 'Scooter' && _selectedType!.name != 'Bike';
+
   void _onTypeChanged(ItemType? type, List<ItemTypeConfig> configs) {
     setState(() {
       _selectedType = type;
       _selectedColorIds = {};
       _selectedVariantIds = {};
+      _gstSlab = null;
+      _hsnCodeController.clear();
+      for (final c in _weightControllers.values) {
+        c.dispose();
+      }
+      _weightControllers.clear();
+      for (final c in _mrpControllers.values) {
+        c.dispose();
+      }
+      _mrpControllers.clear();
       _typeConfig = type != null
           ? configs.where((c) => c.itemTypeId == type.id).firstOrNull
           : null;
+      if (type != null && type.name != 'Scooter' && type.name != 'Bike') {
+        _itemNameController.text = 'ME';
+        _itemNameLocked = true;
+      } else {
+        _itemNameController.clear();
+        _itemNameLocked = false;
+      }
     });
   }
 
@@ -161,13 +189,6 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
     });
   }
 
-  String _buildFullName(String itemName, String colorName, String variantName) {
-    var name = itemName;
-    if (colorName.isNotEmpty) name += ' - $colorName';
-    if (variantName.isNotEmpty) name += ' - $variantName';
-    return name;
-  }
-
   Future<void> _handleSave() async {
     final itemName = _itemNameController.text.trim();
     if (itemName.isEmpty) {
@@ -176,6 +197,15 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
     }
     if (_selectedType == null) {
       AppSnackBars.showError(context, 'Select item type');
+      return;
+    }
+    final hsn = _hsnCodeController.text.trim();
+    if (hsn.isEmpty) {
+      AppSnackBars.showError(context, 'Enter HSN code');
+      return;
+    }
+    if (_gstSlab == null) {
+      AppSnackBars.showError(context, 'Select GST slab');
       return;
     }
 
@@ -194,9 +224,8 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
       final selectedColors = colors.where((c) => _selectedColorIds.contains(c.id)).toList();
       final selectedVariants = variants.where((v) => _selectedVariantIds.contains(v.id)).toList();
 
-      final combos = _computeCombinations(itemName, selectedColors, selectedVariants);
+      final combos = _computeCombinations(itemName, _selectedType!.name, selectedColors, selectedVariants);
       final hsn = _hsnCodeController.text.trim();
-      final gst = _gstSlab;
 
       final recordsToCreate = <Map<String, dynamic>>[];
       var codeNum = int.parse(nextCode.substring(2));
@@ -205,8 +234,6 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
         final srcKey = _syncWeightMrp ? combos.first.key : combo.key;
         final weightCtrl = _weightControllers[srcKey];
         final mrpCtrl = _mrpControllers[srcKey];
-        final weight = double.tryParse(weightCtrl?.text ?? '') ?? 0;
-        final mrp = double.tryParse(mrpCtrl?.text ?? '') ?? 0;
 
         final parts = combo.key.split('_');
         String? colorId;
@@ -221,19 +248,20 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
         }
 
         final code = 'ME${codeNum.toString().padLeft(4, '0')}';
-        recordsToCreate.add({
+        final entry = <String, dynamic>{
           'item_full_name': combo.name,
           'item_name': itemName,
           'item_code': code,
           'item_type': _selectedType!.id,
-          'item_color': colorId,
-          'item_variant': variantId,
-          'hsn_code': hsn.isEmpty ? null : hsn,
-          'item_weight': weight,
-          'item_mrp': mrp,
-          'gst_slab': gst.isEmpty ? null : gst,
+          'item_weight': weightCtrl?.text ?? '0',
+          'item_mrp': mrpCtrl?.text ?? '0',
+          'gst_slab': _gstSlab,
           'status': 'active',
-        });
+        };
+        if (colorId != null) entry['item_color'] = colorId;
+        if (variantId != null) entry['item_variant'] = variantId;
+        if (hsn.isNotEmpty) entry['hsn_code'] = hsn;
+        recordsToCreate.add(entry);
         codeNum++;
       }
 
@@ -280,16 +308,15 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
     final selectedVariants = filteredVariants.where((v) => _selectedVariantIds.contains(v.id)).toList();
     final combos = _computeCombinations(
       _itemNameController.text.trim(),
+      _selectedType?.name ?? '',
       selectedColors,
       selectedVariants,
     );
     _rebuildVariantDetails(combos);
 
-    if (_gstSlab.isEmpty && _gstOptions.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _gstSlab = _gstOptions.first);
-      });
-    }
+    final hasColorChips = _typeConfig?.appliesColor == true && activeColors.isNotEmpty;
+    final hasVariantChips = _typeConfig?.appliesVariant == true && filteredVariants.isNotEmpty;
+    final showWeightMrp = _selectedType != null && (!hasColorChips && !hasVariantChips || _selectedColorIds.isNotEmpty || _selectedVariantIds.isNotEmpty);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -312,9 +339,21 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildWhiteCard(children: [
-              _buildTextField(label: 'Item Name *', controller: _itemNameController, icon: Icons.inventory_2_outlined, capitalization: TextCapitalization.words),
-              const SizedBox(height: 16),
               _buildTypePicker(activeTypes, configs),
+              if (_selectedType != null) ...[
+                const SizedBox(height: 16),
+                _isAutoNameType && _itemNameLocked
+                    ? _buildLockedNameField()
+                    : _buildTextField(
+                        label: 'Item Name *',
+                        controller: _itemNameController,
+                        icon: Icons.inventory_2_outlined,
+                        capitalization: TextCapitalization.words,
+                        onTapOutside: _isAutoNameType ? () => setState(() => _itemNameLocked = true) : null,
+                      ),
+                const SizedBox(height: 16),
+                _buildTextField(label: 'HSN Code *', controller: _hsnCodeController, icon: Icons.confirmation_number_outlined, keyboardType: TextInputType.number),
+              ],
             ]),
             const SizedBox(height: 16),
             if (_typeConfig?.appliesColor == true && activeColors.isNotEmpty)
@@ -327,13 +366,7 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
                 _buildChipSection(label: 'Variants', items: filteredVariants, selectedIds: _selectedVariantIds, onToggle: _onVariantToggled),
               ]),
             ],
-            if (_selectedType != null) ...[
-              const SizedBox(height: 16),
-              _buildWhiteCard(children: [
-                _buildTextField(label: 'HSN Code', controller: _hsnCodeController, icon: Icons.confirmation_number_outlined),
-              ]),
-            ],
-            if (combos.isNotEmpty) ...[
+            if (showWeightMrp) ...[
               const SizedBox(height: 16),
               _buildWhiteCard(children: [
                 _buildWeightMrpHeader(combos),
@@ -390,12 +423,14 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
     TextCapitalization capitalization = TextCapitalization.none,
+    VoidCallback? onTapOutside,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       textCapitalization: capitalization,
       style: AppTypography.input,
+      onTapOutside: onTapOutside != null ? (_) => onTapOutside() : null,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: AppTypography.bodySmall,
@@ -404,6 +439,45 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
         fillColor: AppColors.background,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    );
+  }
+
+  Widget _buildLockedNameField() {
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.inventory_2_outlined, size: 20, color: AppColors.textSecondary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text('Item Name *', style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted)),
+                const SizedBox(height: 2),
+                Text('ME', style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary)),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () => setState(() => _itemNameLocked = false),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.link_rounded, size: 16, color: AppColors.textMuted),
+                const SizedBox(width: 4),
+                Text('Tap to edit', style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -446,12 +520,7 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
     );
   }
 
-  void _showPickerSheet({
-    required String title,
-    required List<String> options,
-    required String selected,
-    required ValueChanged<String> onSelected,
-  }) {
+  void _showGstPickerSheet() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -470,10 +539,10 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
             ),
             Padding(
               padding: const EdgeInsets.all(20),
-              child: Text(title, style: AppTypography.h2),
+              child: Text('Select GST Slab', style: AppTypography.h2),
             ),
-            ...options.map((opt) {
-              final isSel = selected == opt;
+            ..._gstOptions.map((opt) {
+              final isSel = _gstSlab == opt;
               return ListTile(
                 leading: Icon(
                   isSel ? Icons.check_circle_rounded : Icons.circle_outlined,
@@ -481,7 +550,7 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
                   size: 22,
                 ),
                 title: Text(
-                  opt,
+                  '$opt%',
                   style: AppTypography.bodyLarge.copyWith(
                     color: isSel ? AppColors.primary : AppColors.textPrimary,
                     fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
@@ -489,7 +558,7 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
                 ),
                 onTap: () {
                   Navigator.pop(ctx);
-                  onSelected(opt);
+                  setState(() => _gstSlab = opt);
                 },
               );
             }),
@@ -631,14 +700,9 @@ class _AddInventoryScreenState extends ConsumerState<AddInventoryScreen> {
   Widget _buildGstSlabPicker() {
     return _buildPickerField(
       label: 'GST Slab',
-      value: _gstSlab,
+      value: _gstSlab != null ? '$_gstSlab%' : 'Select',
       icon: Icons.percent_rounded,
-      onTap: () => _showPickerSheet(
-        title: 'Select GST Slab',
-        options: _gstOptions,
-        selected: _gstSlab,
-        onSelected: (v) => setState(() => _gstSlab = v),
-      ),
+      onTap: _showGstPickerSheet,
     );
   }
 
