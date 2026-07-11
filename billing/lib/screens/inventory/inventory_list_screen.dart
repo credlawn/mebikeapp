@@ -28,6 +28,11 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tabController.addListener(() {
+        if (!_tabController.indexIsChanging && mounted) setState(() {});
+      });
+    });
   }
 
   @override
@@ -165,8 +170,8 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: IndexedStack(
+        index: _tabController.index,
         children: [
           _buildItemList(activeItems, itemsAsync),
           _buildItemList(inactiveItems, itemsAsync),
@@ -187,117 +192,117 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen>
       },
       color: AppColors.primary,
       backgroundColor: Colors.white,
-      child: itemsAsync.when(
-        data: (_) => items.isEmpty
-            ? SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.7,
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.inventory_2_outlined, size: 64, color: AppColors.textMuted),
-                        const SizedBox(height: 16),
-                        Text('No items found.', style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted)),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    children: items.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final item = entry.value;
-                      return Column(
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: MediaQuery.of(context).size.height * 0.8),
+          child: itemsAsync.when(
+            data: (_) => items.isEmpty
+                ? SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.7,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          if (index > 0) const Divider(height: 1, color: AppColors.border),
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () => _navigateToDetail(item),
-                              onLongPress: () => _deleteItem(item),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                child: Row(
-                                  children: [
-                                    SizedBox(
-                                      width: 28,
-                                      child: Text(
-                                        '${index + 1}.',
-                                        style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                          const Icon(Icons.inventory_2_outlined, size: 64, color: AppColors.textMuted),
+                          const SizedBox(height: 16),
+                          Text('No items found.', style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted)),
+                        ],
+                      ),
+                    ),
+                  )
+                : Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          children: items.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final item = entry.value;
+                            return Column(
+                              children: [
+                                if (index > 0) const Divider(height: 1, color: AppColors.border),
+                                Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () => _navigateToDetail(item),
+                                    onLongPress: () => _deleteItem(item),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                      child: Row(
                                         children: [
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Flexible(
-                                                child: Text(
-                                                  item.itemFullName.isNotEmpty ? item.itemFullName : item.itemName,
-                                                  style: AppTypography.h3,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              Text(
-                                                item.itemCode,
-                                                style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
-                                              ),
-                                            ],
+                                          SizedBox(
+                                            width: 28,
+                                            child: Text(
+                                              '${index + 1}.',
+                                              style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                                            ),
                                           ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              Text(
-                                                '₹ ${item.itemMrp.toStringAsFixed(0)}',
-                                                style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                '${item.itemWeight % 1 == 0 ? item.itemWeight.toInt() : item.itemWeight} kg',
-                                                style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                'GST ${item.gstSlab}%',
-                                                style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
-                                              ),
-                                            ],
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Flexible(
+                                                      child: Text(
+                                                        item.itemFullName.isNotEmpty ? item.itemFullName : item.itemName,
+                                                        style: AppTypography.h3,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      item.itemCode,
+                                                      style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      '₹ ${item.itemMrp.toStringAsFixed(0)}',
+                                                      style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      '${item.itemWeight % 1 == 0 ? item.itemWeight.toInt() : item.itemWeight} kg',
+                                                      style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      'GST ${item.gstSlab}%',
+                                                      style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => Center(child: Text('Error: $err\nPull to retry')),
       ),
-    );
+    ),
+  ),
+);
   }
 
   void _navigateToAdd() {

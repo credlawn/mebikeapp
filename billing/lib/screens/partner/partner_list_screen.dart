@@ -29,6 +29,11 @@ class _PartnerListScreenState extends ConsumerState<PartnerListScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tabController.addListener(() {
+        if (!_tabController.indexIsChanging && mounted) setState(() {});
+      });
+    });
   }
 
   @override
@@ -95,13 +100,9 @@ class _PartnerListScreenState extends ConsumerState<PartnerListScreen>
           ],
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: () => _handleRefresh(ref, context),
-        color: AppColors.primary,
-        backgroundColor: Colors.white,
-        child: partnersAsync.when(
-          data: (_) => TabBarView(
-            controller: _tabController,
+      body: partnersAsync.when(
+          data: (_) => IndexedStack(
+            index: _tabController.index,
             children: [
               _PartnerList(
                 partners: activePartners,
@@ -130,7 +131,6 @@ class _PartnerListScreenState extends ConsumerState<PartnerListScreen>
                 height: MediaQuery.of(context).size.height * 0.7,
                 child: Center(child: Text('Error: $err\nPull to retry')),
               ),
-            ),
           ),
         ),
       ),
@@ -157,156 +157,156 @@ class _PartnerList extends StatelessWidget {
       onRefresh: onRefresh,
       color: AppColors.primary,
       backgroundColor: Colors.white,
-      child: partners.isEmpty
-          ? SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height * 0.7,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        isDraft
-                            ? Icons.edit_note_rounded
-                            : (isActive
-                                  ? Icons.people_outline_rounded
-                                  : Icons.person_off_outlined),
-                        size: 64,
-                        color: AppColors.textMuted,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No ${isDraft ? 'draft' : (isActive ? 'active' : 'inactive')} partners found.',
-                        style: AppTypography.bodyMedium.copyWith(
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: MediaQuery.of(context).size.height * 0.8),
+          child: partners.isEmpty
+              ? SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          isDraft
+                              ? Icons.edit_note_rounded
+                              : (isActive
+                                    ? Icons.people_outline_rounded
+                                    : Icons.person_off_outlined),
+                          size: 64,
                           color: AppColors.textMuted,
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text('Pull to refresh', style: AppTypography.bodySmall),
-                    ],
+                        const SizedBox(height: 16),
+                        Text(
+                          'No ${isDraft ? 'draft' : (isActive ? 'active' : 'inactive')} partners found.',
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text('Pull to refresh', style: AppTypography.bodySmall),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: partners.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final partner = entry.value;
-                    return Column(
-                      children: [
-                        if (index > 0) const Divider(height: 1, color: AppColors.border),
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              if (isDraft) {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => AddPartnerScreen(draftId: partner.id),
-                                  ),
-                                );
-                              } else {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => PartnerDetailScreen(partnerId: partner.id),
-                                  ),
-                                );
-                              }
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    width: 28,
-                                    child: Text(
-                                      '${index + 1}.',
-                                      style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                )
+              : Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: partners.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final partner = entry.value;
+                      return Column(
+                        children: [
+                          if (index > 0) const Divider(height: 1, color: AppColors.border),
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                if (isDraft) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => AddPartnerScreen(draftId: partner.id),
                                     ),
-                                  ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Flexible(
-                                              child: Text(
-                                                partner.partnerName,
-                                                style: AppTypography.h3,
-                                                overflow: TextOverflow.ellipsis,
+                                  );
+                                } else {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => PartnerDetailScreen(partnerId: partner.id),
+                                    ),
+                                  );
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 28,
+                                      child: Text(
+                                        '${index + 1}.',
+                                        style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Flexible(
+                                                child: Text(
+                                                  partner.partnerName,
+                                                  style: AppTypography.h3,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
                                               ),
-                                            ),
-                                            if (!isDraft)
-                                              Text(
-                                                partner.partnerCode,
-                                                style: AppTypography.bodySmall.copyWith(
-                                                  color: AppColors.primary,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              )
-                                            else
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.orange.shade100,
-                                                  borderRadius: BorderRadius.circular(4),
-                                                ),
-                                                child: const Text(
-                                                  'DRAFT',
-                                                  style: TextStyle(
-                                                    color: Colors.orange,
-                                                    fontSize: 9,
+                                              if (!isDraft)
+                                                Text(
+                                                  partner.partnerCode,
+                                                  style: AppTypography.bodySmall.copyWith(
+                                                    color: AppColors.primary,
                                                     fontWeight: FontWeight.bold,
                                                   ),
+                                                )
+                                              else
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.orange.shade100,
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: const Text(
+                                                    'DRAFT',
+                                                    style: TextStyle(
+                                                      color: Colors.orange,
+                                                      fontSize: 9,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Text(
+                                                _toTitleCase(partner.partnerType),
+                                                style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  '${partner.billingDistrict.isNotEmpty ? _toTitleCase(partner.billingDistrict) : '—'}, ${partner.billingState.isNotEmpty ? partner.billingState : '—'}',
+                                                  style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                                                  overflow: TextOverflow.ellipsis,
                                                 ),
                                               ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            Text(
-                                              _toTitleCase(partner.partnerType),
-                                              style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                '${partner.billingDistrict.isNotEmpty ? _toTitleCase(partner.billingDistrict) : '—'}, ${partner.billingState.isNotEmpty ? partner.billingState : '—'}',
-                                                style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
+                                            ],
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
+                        ],
+                      );
+                    }).toList(),
+                  ),
                 ),
-              ),
-            ),
+        ),
+      ),
     );
   }
 }
