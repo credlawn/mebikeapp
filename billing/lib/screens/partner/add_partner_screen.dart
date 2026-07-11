@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:pocketbase/pocketbase.dart';
 import '../../providers/partner_provider.dart';
 import '../../pb_service.dart';
+import '../../config.dart';
 import '../../theme/app_snackbars.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
@@ -457,7 +458,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     }
     setState(() {});
     try {
-      final res = await http.get(Uri.parse('https://api.postalpincode.in/pincode/$pincode')).timeout(const Duration(seconds: 10));
+      final res = await http.get(Uri.parse('${AppConfig.pincodeApiUrl}/pincode/$pincode')).timeout(const Duration(seconds: 10));
       if (!mounted) return;
       final data = (jsonDecode(res.body) as List).first as Map<String, dynamic>;
       if (data['Status'] != 'Success') {
@@ -508,7 +509,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     }
     setState(() => _isFetchingIfsc = true);
     try {
-      final res = await http.get(Uri.parse('https://ifsc.razorpay.com/$ifsc')).timeout(const Duration(seconds: 10));
+      final res = await http.get(Uri.parse('${AppConfig.ifscApiUrl}/$ifsc')).timeout(const Duration(seconds: 10));
       if (res.statusCode == 404) {
         if (mounted) AppSnackBars.showError(context, 'IFSC code not found');
         return;

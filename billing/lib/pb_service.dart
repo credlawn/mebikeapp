@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:pocketbase/pocketbase.dart';
 import 'package:flutter/foundation.dart';
+import 'package:pocketbase/pocketbase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'api_provider.dart';
+import 'config.dart';
 import 'login_screen.dart';
 import 'theme/app_snackbars.dart';
 import 'services/lock_service.dart';
@@ -16,7 +16,7 @@ class PbService {
   factory PbService() => _instance;
 
   PbService._internal() {
-    pb = PocketBase(ApiProvider.baseUrl);
+    pb = PocketBase(AppConfig.pocketbaseUrl);
   }
 
   Future<void> init() async {
