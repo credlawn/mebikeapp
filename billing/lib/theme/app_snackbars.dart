@@ -26,7 +26,7 @@ class AppSnackBars {
         ),
         margin: const EdgeInsets.all(16),
         elevation: 4,
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 1),
       ),
     );
   }
@@ -54,7 +54,7 @@ class AppSnackBars {
         ),
         margin: const EdgeInsets.all(16),
         elevation: 4,
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 2),
       ),
     );
   }

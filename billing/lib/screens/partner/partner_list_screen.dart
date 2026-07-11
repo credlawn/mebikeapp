@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../models/partner_model.dart';
 import '../../providers/partner_provider.dart';
 import '../../theme/colors.dart';
@@ -30,9 +29,6 @@ class _PartnerListScreenState extends ConsumerState<PartnerListScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging && mounted) setState(() {});
-    });
   }
 
   @override
@@ -56,6 +52,7 @@ class _PartnerListScreenState extends ConsumerState<PartnerListScreen>
       if (context.mounted) AppSnackBars.showError(context, e.toString());
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -192,166 +189,131 @@ class _PartnerList extends StatelessWidget {
                 ),
               ),
             )
-          : ListView.separated(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: partners.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final partner = partners[index];
-                return _PartnerTile(partner: partner, isDraft: isDraft);
-              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: partners.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final partner = entry.value;
+                    return Column(
+                      children: [
+                        if (index > 0) const Divider(height: 1, color: AppColors.border),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              if (isDraft) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => AddPartnerScreen(draftId: partner.id),
+                                  ),
+                                );
+                              } else {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => PartnerDetailScreen(partnerId: partner.id),
+                                  ),
+                                );
+                              }
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 28,
+                                    child: Text(
+                                      '${index + 1}.',
+                                      style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                partner.partnerName,
+                                                style: AppTypography.h3,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (!isDraft)
+                                              Text(
+                                                partner.partnerCode,
+                                                style: AppTypography.bodySmall.copyWith(
+                                                  color: AppColors.primary,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              )
+                                            else
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange.shade100,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Text(
+                                                  'DRAFT',
+                                                  style: TextStyle(
+                                                    color: Colors.orange,
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              _toTitleCase(partner.partnerType),
+                                              style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                '${partner.billingDistrict.isNotEmpty ? _toTitleCase(partner.billingDistrict) : '—'}, ${partner.billingState.isNotEmpty ? partner.billingState : '—'}',
+                                                style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
     );
   }
 }
 
-class _PartnerTile extends StatelessWidget {
-  final Partner partner;
-  final bool isDraft;
-
-  const _PartnerTile({required this.partner, this.isDraft = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd MMM yyyy');
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            if (isDraft) {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => AddPartnerScreen(draftId: partner.id),
-                ),
-              );
-            } else {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => PartnerDetailScreen(partnerId: partner.id),
-                ),
-              );
-            }
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                // Avatar/Icon
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: isDraft
-                        ? Colors.orange.shade50
-                        : AppColors.primaryLight,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      partner.partnerName.isNotEmpty
-                          ? partner.partnerName.substring(0, 1).toUpperCase()
-                          : 'P',
-                      style: AppTypography.h3.copyWith(
-                        color: isDraft ? Colors.orange : AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-
-                // Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              partner.partnerName,
-                              style: AppTypography.h3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (!isDraft)
-                            Text(
-                              partner.partnerCode,
-                              style: AppTypography.bodySmall.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )
-                          else
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade100,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'DRAFT',
-                                style: TextStyle(
-                                  color: Colors.orange,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.business_center_outlined,
-                            size: 14,
-                            color: AppColors.textMuted,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            partner.partnerType.toUpperCase(),
-                            style: AppTypography.bodySmall.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Icon(
-                            Icons.calendar_today_rounded,
-                            size: 14,
-                            color: AppColors.textMuted,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            partner.onboardingDate != null
-                                ? dateFormat.format(partner.onboardingDate!)
-                                : 'N/A',
-                            style: AppTypography.bodySmall.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+String _toTitleCase(String text) {
+  if (text.isEmpty) return text;
+  return text[0].toUpperCase() + text.substring(1).toLowerCase();
 }
+
+

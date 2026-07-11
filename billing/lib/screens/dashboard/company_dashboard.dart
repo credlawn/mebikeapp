@@ -100,7 +100,7 @@ class _CompanyDashboardState extends ConsumerState<CompanyDashboard> with Single
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 0.9,
+                childAspectRatio: 1.15,
                 children: [
                   ModuleCard(
                     title: 'Partners',
@@ -228,7 +228,7 @@ class ModuleCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),

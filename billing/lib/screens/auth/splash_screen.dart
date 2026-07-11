@@ -23,7 +23,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final pbService = PbService();
 
     // 1. Minimum delay for the animation to look good
-    final animationDelay = Future.delayed(const Duration(seconds: 3));
+    final animationDelay = Future.delayed(const Duration(seconds: 1));
 
     // 2. Pre-fetch all data in the background
     // This happens while the GIF is playing

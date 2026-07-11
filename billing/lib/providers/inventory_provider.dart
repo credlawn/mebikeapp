@@ -120,6 +120,10 @@ class InventoryRepository {
   Future<void> updateItem(String id, Map<String, dynamic> body) async {
     await _pbService.pb.collection('item_list').update(id, body: body);
   }
+
+  Future<void> deleteItem(String id) async {
+    await _pbService.pb.collection('item_list').delete(id);
+  }
 }
 
 final inventoryRepositoryProvider = Provider((ref) => InventoryRepository());
@@ -147,4 +151,14 @@ final allItemTypeConfigsProvider = FutureProvider<List<ItemTypeConfig>>((ref) as
 final allItemListProvider = FutureProvider<List<ItemList>>((ref) async {
   ref.keepAlive();
   return ref.watch(inventoryRepositoryProvider).getAllItemList();
+});
+
+final activeItemListProvider = Provider<List<ItemList>>((ref) {
+  final all = ref.watch(allItemListProvider).value ?? [];
+  return all.where((i) => i.status == 'active').toList();
+});
+
+final inactiveItemListProvider = Provider<List<ItemList>>((ref) {
+  final all = ref.watch(allItemListProvider).value ?? [];
+  return all.where((i) => i.status == 'inactive').toList();
 });

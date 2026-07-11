@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/item_type_model.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
+import '../../pb_service.dart';
 import '../../theme/app_snackbars.dart';
 import '../../providers/inventory_provider.dart';
 
@@ -115,10 +116,28 @@ class _InventoryMasterScreenState extends ConsumerState<InventoryMasterScreen> {
             content: SizedBox(
               width: double.maxFinite,
               child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isVariant) ...[
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!isVariant)
+                        TextFormField(
+                          controller: _nameController,
+                          autofocus: true,
+                          textCapitalization: TextCapitalization.words,
+                          style: AppTypography.input,
+                          decoration: InputDecoration(
+                            labelText: 'Name',
+                            labelStyle: AppTypography.bodySmall,
+                            prefixIcon: Icon(widget.icon, size: 18, color: AppColors.textSecondary),
+                            filled: true,
+                            fillColor: AppColors.background,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          ),
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                        ),
+                      if (!isVariant) const SizedBox(height: 16),
+                      if (isVariant) ...[
                       Text('Variant For', style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted)),
                       const SizedBox(height: 8),
                       Wrap(
@@ -160,6 +179,7 @@ class _InventoryMasterScreenState extends ConsumerState<InventoryMasterScreen> {
                         TextFormField(
                           controller: _nameController,
                           autofocus: true,
+                          textCapitalization: TextCapitalization.words,
                           style: AppTypography.input,
                           decoration: InputDecoration(
                             labelText: 'Name',
@@ -290,13 +310,34 @@ class _InventoryMasterScreenState extends ConsumerState<InventoryMasterScreen> {
                       ? _selectedVariantForIds.toList()
                       : null;
                   try {
+                    final allNames = <String>[];
+                    if (isBatteryOnly && names.isNotEmpty) {
+                      allNames.addAll(names);
+                    } else {
+                      final raw = _nameController.text;
+                      final name = raw.trim().replaceAll(RegExp(r'\s+'), ' ');
+                      if (name.isEmpty) return;
+                      _nameController.text = name;
+                      allNames.add(name);
+                    }
+
+                    final existing = await PbService().pb.collection(widget.collectionName).getFullList();
+                    for (final n in allNames) {
+                      final isDuplicate = existing.any(
+                        (r) => r.getStringValue('name').trim().toLowerCase() == n.toLowerCase(),
+                      );
+                      if (isDuplicate) {
+                        if (ctx.mounted) AppSnackBars.showError(ctx, '${widget.title} "$n" already exists');
+                        return;
+                      }
+                    }
+
                     if (isBatteryOnly && names.isNotEmpty) {
                       for (final n in names) {
                         await _createItem(n, variantFor: variantFor);
                       }
                     } else {
                       final name = _nameController.text.trim();
-                      if (name.isEmpty) return;
                       await _createItem(name, variantFor: variantFor);
                     }
                     if (ctx.mounted) Navigator.pop(ctx);

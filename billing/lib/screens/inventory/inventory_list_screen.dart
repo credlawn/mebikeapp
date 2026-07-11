@@ -15,10 +15,110 @@ class InventoryListScreen extends ConsumerStatefulWidget {
   ConsumerState<InventoryListScreen> createState() => _InventoryListScreenState();
 }
 
-class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
+class _InventoryListScreenState extends ConsumerState<InventoryListScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  static const _tabColors = [
+    AppColors.primary,
+    AppColors.error,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _deleteItem(ItemList item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 28),
+            ),
+            const SizedBox(height: 20),
+            Text('Delete Item?', style: AppTypography.h2.copyWith(fontSize: 18)),
+            const SizedBox(height: 12),
+            Text(
+              'Are you sure you want to delete "${item.itemFullName.isNotEmpty ? item.itemFullName : item.itemName}"?',
+              style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary, width: 1.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text('Cancel', style: AppTypography.button.copyWith(color: AppColors.primary)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text('Delete', style: AppTypography.button.copyWith(color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final repo = ref.read(inventoryRepositoryProvider);
+      await repo.deleteItem(item.id);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.invalidate(allItemListProvider);
+      });
+      if (mounted) AppSnackBars.showSuccess(context, 'Item deleted');
+    } catch (_) {
+      if (mounted) AppSnackBars.showError(context, 'Cannot reach server');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final activeItems = ref.watch(activeItemListProvider);
+    final inactiveItems = ref.watch(inactiveItemListProvider);
     final itemsAsync = ref.watch(allItemListProvider);
+    final tabColor = _tabColors[_tabController.index];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -53,129 +153,149 @@ class _InventoryListScreenState extends ConsumerState<InventoryListScreen> {
           ),
           const SizedBox(width: 8),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: tabColor,
+          labelColor: tabColor,
+          unselectedLabelColor: AppColors.textSecondary,
+          labelStyle: AppTypography.h3,
+          tabs: [
+            Tab(text: 'Active (${activeItems.length})'),
+            Tab(text: 'Inactive (${inactiveItems.length})'),
+          ],
+        ),
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          try {
-            await ref.refresh(allItemListProvider.future).timeout(const Duration(seconds: 5), onTimeout: () => throw 'Timeout');
-            if (context.mounted) AppSnackBars.showSuccess(context, 'Inventory updated');
-          } catch (e) {
-            if (context.mounted) AppSnackBars.showError(context, e.toString());
-          }
-        },
-        color: AppColors.primary,
-        backgroundColor: Colors.white,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.8,
-            child: itemsAsync.when(
-              data: (items) => items.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildItemList(activeItems, itemsAsync),
+          _buildItemList(inactiveItems, itemsAsync),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemList(List<ItemList> items, AsyncValue<List<ItemList>> itemsAsync) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        try {
+          await ref.refresh(allItemListProvider.future).timeout(const Duration(seconds: 5), onTimeout: () => throw 'Timeout');
+          if (mounted) AppSnackBars.showSuccess(context, 'Inventory updated');
+        } catch (e) {
+          if (mounted) AppSnackBars.showError(context, e.toString());
+        }
+      },
+      color: AppColors.primary,
+      backgroundColor: Colors.white,
+      child: itemsAsync.when(
+        data: (_) => items.isEmpty
+            ? SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.inventory_2_outlined, size: 64, color: AppColors.textMuted),
+                        const SizedBox(height: 16),
+                        Text('No items found.', style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted)),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: items.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final item = entry.value;
+                      return Column(
                         children: [
-                          const Icon(Icons.inventory_2_outlined, size: 64, color: AppColors.textMuted),
-                          const SizedBox(height: 16),
-                          Text('No inventory items found.', style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted)),
-                          const SizedBox(height: 8),
-                          Text('Pull to refresh', style: AppTypography.bodySmall),
-                        ],
-                      ),
-                    )
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Column(
-                          children: items.asMap().entries.map((entry) {
-                            final index = entry.key;
-                            final item = entry.value;
-                            return Column(
-                              children: [
-                                if (index > 0) const Divider(height: 1, color: AppColors.border),
-                                Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () => _navigateToDetail(item),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                      child: Row(
+                          if (index > 0) const Divider(height: 1, color: AppColors.border),
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _navigateToDetail(item),
+                              onLongPress: () => _deleteItem(item),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 28,
+                                      child: Text(
+                                        '${index + 1}.',
+                                        style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          SizedBox(
-                                            width: 28,
-                                            child: Text(
-                                              '${index + 1}.',
-                                              style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
-                                            ),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Flexible(
+                                                child: Text(
+                                                  item.itemFullName.isNotEmpty ? item.itemFullName : item.itemName,
+                                                  style: AppTypography.h3,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              Text(
+                                                item.itemCode,
+                                                style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
                                           ),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                  children: [
-                                                    Flexible(
-                                                      child: Text(
-                                                        item.itemFullName.isNotEmpty ? item.itemFullName : item.itemName,
-                                                        style: AppTypography.h3,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      item.itemCode,
-                                                      style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Row(
-                                                  children: [
-                                                    Text(
-                                                      '₹ ${item.itemMrp.toStringAsFixed(0)}',
-                                                      style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
-                                                    const SizedBox(width: 8),
-                                                    Text(
-                                                      '${item.itemWeight % 1 == 0 ? item.itemWeight.toInt() : item.itemWeight} kg',
-                                                      style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
-                                                    const SizedBox(width: 8),
-                                                    Text(
-                                                      'GST ${item.gstSlab}%',
-                                                      style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Text(
+                                                '₹ ${item.itemMrp.toStringAsFixed(0)}',
+                                                style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                '${item.itemWeight % 1 == 0 ? item.itemWeight.toInt() : item.itemWeight} kg',
+                                                style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'GST ${item.gstSlab}%',
+                                                style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
+                                              ),
+                                            ],
                                           ),
                                         ],
                                       ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ],
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Error: $err\nPull to retry')),
-            ),
-          ),
-        ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(child: Text('Error: $err\nPull to retry')),
       ),
     );
   }
