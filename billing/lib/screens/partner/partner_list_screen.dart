@@ -49,8 +49,9 @@ class _PartnerListScreenState extends ConsumerState<PartnerListScreen>
             const Duration(seconds: 5),
             onTimeout: () => throw 'Sync timeout. Check your connection.',
           );
-      if (context.mounted)
+      if (context.mounted) {
         AppSnackBars.showSuccess(context, 'Partners list updated');
+      }
     } catch (e) {
       if (context.mounted) AppSnackBars.showError(context, e.toString());
     }

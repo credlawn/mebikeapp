@@ -7,6 +7,10 @@ import 'screens/auth/app_lock_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/partner/partner_list_screen.dart';
 import 'screens/partner/add_partner_screen.dart';
+import 'screens/inventory/inventory_list_screen.dart';
+import 'screens/inventory/add_inventory_screen.dart';
+import 'screens/inventory/inventory_master_screen.dart';
+import 'screens/inventory/item_type_config_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() async {
@@ -93,11 +97,39 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             borderRadius: BorderRadius.circular(16),
           ),
         ),
+        popupMenuTheme: PopupMenuThemeData(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 4,
+        ),
       ),
       home: const SplashScreen(),
       routes: {
         '/partner-list': (context) => const PartnerListScreen(),
         '/add-partner': (context) => const AddPartnerScreen(),
+        '/inventory-list': (context) => const InventoryListScreen(),
+        '/add-inventory': (context) => const AddInventoryScreen(),
+        '/item-types': (context) => const InventoryMasterScreen(
+          title: 'Item Types',
+          collectionName: 'item_type',
+          masterType: InventoryMasterType.itemType,
+          icon: Icons.category_outlined,
+        ),
+        '/item-colors': (context) => const InventoryMasterScreen(
+          title: 'Item Colors',
+          collectionName: 'item_color',
+          masterType: InventoryMasterType.itemColor,
+          icon: Icons.palette_outlined,
+        ),
+        '/item-variants': (context) => const InventoryMasterScreen(
+          title: 'Item Variants',
+          collectionName: 'item_variant',
+          masterType: InventoryMasterType.itemVariant,
+          icon: Icons.tune_outlined,
+        ),
+        '/item-type-config': (context) => const ItemTypeConfigScreen(),
       },
     );
   }

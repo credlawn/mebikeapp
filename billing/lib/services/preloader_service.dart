@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/partner_provider.dart';
+import '../providers/inventory_provider.dart';
 import '../pb_service.dart';
 
 class PreloaderService {
@@ -8,6 +9,11 @@ class PreloaderService {
   static final Map<String, List<dynamic>> _roleRegistry = {
     'company': [
       allPartnersProvider,
+      allItemListProvider,
+      allItemTypesProvider,
+      allItemColorsProvider,
+      allItemVariantsProvider,
+      allItemTypeConfigsProvider,
     ],
     'sales': [],
     'mechanic': [],

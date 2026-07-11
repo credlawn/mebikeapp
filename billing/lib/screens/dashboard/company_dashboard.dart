@@ -114,11 +114,12 @@ class _CompanyDashboardState extends ConsumerState<CompanyDashboard> with Single
                     badge: activeCount > 0 ? '$activeCount Active' : null,
                     onTap: () => Navigator.pushNamed(context, '/partner-list'),
                   ),
-                  const ModuleCard(
+                  ModuleCard(
                     title: 'Inventory',
-                    subtitle: 'Stock & Items',
+                    subtitle: 'Items & Masters',
                     icon: Icons.inventory_2_outlined,
                     color: Colors.blue,
+                    onTap: () => Navigator.pushNamed(context, '/inventory-list'),
                   ),
                   const ModuleCard(
                     title: 'Billing',
