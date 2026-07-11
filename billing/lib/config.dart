@@ -6,6 +6,6 @@ class AppConfig {
 
   static const String ifscApiUrl = 'https://ifsc.razorpay.com';
   static const String pincodeApiUrl = 'https://api.postalpincode.in';
-  static const String gstApiUrl = '';
-  static const String gstApiKey = '';
+  static const String gstApiUrl = 'https://gstverify.co.in/api/v1/verify';
+  static const String gstApiKey = 'gstv_615cc1024e41331271e64ca5f79b1781bca7c0a9086c6ce4';
 }

@@ -31,7 +31,11 @@ class Partner {
   // Tax Info
   final String panNo;
   final String gstNo;
-  final String gstFilingFrequency; // monthly, quarterly
+  final String legalName;
+  final String gstFilingType;
+  final String stateCode;
+  final String natureOfBusiness;
+  final DateTime? gstRegistrationDate;
 
   // Bank Info
   final String bankName;
@@ -74,7 +78,11 @@ class Partner {
     required this.shippingPincode,
     required this.panNo,
     required this.gstNo,
-    required this.gstFilingFrequency,
+    required this.legalName,
+    required this.gstFilingType,
+    required this.stateCode,
+    required this.natureOfBusiness,
+    this.gstRegistrationDate,
     required this.bankName,
     required this.bankAcNo,
     required this.bankIfscCode,
@@ -119,7 +127,13 @@ class Partner {
       
       panNo: json['pan_no'] ?? '',
       gstNo: json['gst_no'] ?? '',
-      gstFilingFrequency: json['gst_filing_frequency'] ?? 'monthly',
+      legalName: json['legal_name'] ?? '',
+      gstFilingType: json['gst_filing_type'] ?? '',
+      stateCode: json['state_code']?.toString() ?? '',
+      natureOfBusiness: json['nature_of_business'] ?? '',
+      gstRegistrationDate: json['gst_registration_date'] != null && json['gst_registration_date'].toString().isNotEmpty
+          ? DateTime.parse(json['gst_registration_date'].toString())
+          : null,
       
       bankName: json['bank_name'] ?? '',
       bankAcNo: json['bank_ac_no'] ?? '',
@@ -165,7 +179,11 @@ class Partner {
       'shipping_pincode': shippingPincode,
       'pan_no': panNo,
       'gst_no': gstNo,
-      'gst_filing_frequency': gstFilingFrequency,
+      'legal_name': legalName,
+      'gst_filing_type': gstFilingType,
+      'state_code': stateCode,
+      'nature_of_business': natureOfBusiness,
+      'gst_registration_date': gstRegistrationDate?.toIso8601String(),
       'bank_name': bankName,
       'bank_ac_no': bankAcNo,
       'bank_ifsc_code': bankIfscCode,

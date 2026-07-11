@@ -41,6 +41,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   final _emailController = TextEditingController();
   final _personController = TextEditingController();
   final _billingAddressController = TextEditingController();
+  final _billingBusinessController = TextEditingController();
   final _billingLandmarkController = TextEditingController();
   final _billingCityController = TextEditingController();
   final _billingDistrictController = TextEditingController();
@@ -63,7 +64,10 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   String _partnerType = 'dealer';
   String _entityType = 'proprietor';
   String _bankAcType = 'current';
-  String _gstFrequency = 'monthly';
+  String _gstFilingType = '';
+  String _stateCode = '';
+  String _natureOfBusiness = '';
+  DateTime? _gstRegistrationDate;
   DateTime _onboardingDate = DateTime.now();
   String _partnerCode = '';
   String _partnerStatus = 'draft';
@@ -77,7 +81,8 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   final _shippingStateFocus = FocusNode();
   bool _isFetchingBillingPincode = false;
   bool _isFetchingShippingPincode = false;
-
+  bool _isFetchingGstBilling = false;
+  final _gstBillingController = TextEditingController();
   @override
   void initState() {
     super.initState();
@@ -86,6 +91,11 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     }
     _gstController.addListener(_onGstChanged);
     _panController.addListener(_onPanChanged);
+    _gstBillingController.addListener(() {
+      if (_gstController.text != _gstBillingController.text) {
+        _gstController.text = _gstBillingController.text;
+      }
+    });
   }
 
   String? _extractPanFromGst(String gst) {
@@ -94,6 +104,17 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       if (pan.length == 10) return pan;
     }
     return null;
+  }
+
+  Future<bool> _emailExists(String email) async {
+    if (email.isEmpty) return false;
+    final result = await PbService().pb.collection('partner').getList(
+      filter: 'email = "$email" && partner_status != "draft"',
+      perPage: 1,
+    );
+    if (result.items.isEmpty) return false;
+    if (_draftId != null && result.items.first.id == _draftId) return false;
+    return true;
   }
 
   void _onGstChanged() {
@@ -217,10 +238,11 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
 
   void _populateForm(Map<String, dynamic> data) {
     setState(() {
-      _nameController.text = data['partner_name'] ?? '';
+      _nameController.text = data['legal_name'] ?? '';
       _emailController.text = data['email'] ?? '';
       _mobileController.text = data['mobile_no'] ?? '';
       _personController.text = data['key_person_name'] ?? '';
+      _billingBusinessController.text = data['partner_name'] ?? '';
       _billingAddressController.text = data['billing_address'] ?? '';
       _billingLandmarkController.text = data['billing_landmark'] ?? '';
       _billingCityController.text = data['billing_city'] ?? '';
@@ -238,6 +260,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       
       _panController.text = data['pan_no'] ?? '';
       _gstController.text = data['gst_no'] ?? '';
+      _gstBillingController.text = data['gst_no'] ?? '';
       _bankNameController.text = data['bank_name'] ?? '';
       _bankAcController.text = data['bank_ac_no'] ?? '';
       _bankIfscController.text = data['bank_ifsc_code'] ?? '';
@@ -248,8 +271,13 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       _partnerStatus = data['partner_status']?.toString() ?? 'active';
       _partnerType = data['partner_type']?.toString().isEmpty ?? true ? 'dealer' : data['partner_type'];
       _entityType = data['entity_type']?.toString().isEmpty ?? true ? 'proprietor' : data['entity_type'];
+      _gstFilingType = data['gst_filing_type']?.toString() ?? '';
+      _stateCode = data['state_code']?.toString() ?? '';
+      _natureOfBusiness = data['nature_of_business']?.toString() ?? '';
+      if (data['gst_registration_date'] != null) {
+        _gstRegistrationDate = DateTime.parse(data['gst_registration_date'].toString());
+      }
       _bankAcType = data['bank_ac_type']?.toString().isEmpty ?? true ? 'saving' : data['bank_ac_type'];
-      _gstFrequency = data['gst_filing_frequency']?.toString().isEmpty ?? true ? 'monthly' : data['gst_filing_frequency'];
       
       if (data['partner_onboarding_date'] != null) {
         _onboardingDate = DateTime.parse(data['partner_onboarding_date']);
@@ -341,7 +369,8 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     final effectiveCode = _partnerCode.isNotEmpty ? _partnerCode : partnerCode;
     final effectiveStatus = _partnerCode.isNotEmpty ? _partnerStatus : status;
     return {
-      'partner_name': _nameController.text.trim(),
+      'partner_name': _billingBusinessController.text.trim(),
+      'legal_name': _nameController.text.trim(),
       'partner_code': effectiveCode,
       'partner_type': _partnerType,
       'entity_type': _entityType,
@@ -364,7 +393,10 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       'shipping_pincode': _shippingPincodeController.text.trim(),
       'pan_no': _panController.text.trim(),
       'gst_no': _gstController.text.trim(),
-      'gst_filing_frequency': _gstFrequency,
+      'gst_filing_type': _gstFilingType,
+      'state_code': _stateCode,
+      'nature_of_business': _natureOfBusiness,
+      'gst_registration_date': _gstRegistrationDate?.toIso8601String() ?? '',
       'bank_ifsc_code': _bankIfscController.text.trim(),
       'bank_name': _bankIfscController.text.trim().isEmpty ? '' : _bankNameController.text.trim(),
       'bank_ac_no': _bankIfscController.text.trim().isEmpty ? '' : _bankAcController.text.trim(),
@@ -383,20 +415,44 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
   }
 
   Future<void> _handleSaveData({required bool isFinal, bool advanceStep = false, String status = 'draft'}) async {
+    setState(() {
+      _isLoading = true;
+      _syncState = _SyncState.syncing;
+    });
+
+    final email = _emailController.text.trim();
+    if (email.isNotEmpty) {
+      try {
+        final exists = await _emailExists(email);
+        if (exists) {
+          if (mounted) {
+            AppSnackBars.showError(context, 'Email already registered. Please use a different email.');
+            setState(() { _isLoading = false; _syncState = null; });
+          }
+          return;
+        }
+      } catch (_) {
+        if (mounted) {
+          AppSnackBars.showError(context, 'Cannot verify email. Please try again.');
+          setState(() { _isLoading = false; _syncState = null; });
+        }
+        return;
+      }
+    }
+
     if (isFinal) {
       final gst = _gstController.text;
       final pan = _panController.text;
       final extracted = _extractPanFromGst(gst);
       if (extracted != null && pan.isNotEmpty && pan != extracted) {
-        if (mounted) AppSnackBars.showError(context, 'PAN & GST number mismatch. Please correct or clear the PAN field.');
+        if (mounted) {
+          AppSnackBars.showError(context, 'PAN & GST number mismatch. Please correct or clear the PAN field.');
+          setState(() { _isLoading = false; _syncState = null; });
+        }
         return;
       }
     }
 
-    setState(() {
-      _isLoading = true;
-      _syncState = _SyncState.syncing;
-    });
     try {
       final repo = ref.read(partnerRepositoryProvider);
       String partnerCode = '';
@@ -406,6 +462,19 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
       }
 
       final body = _buildBody(partnerCode: partnerCode, status: isFinal ? status : 'draft');
+
+      if (_draftId == null) {
+        final email = _emailController.text.trim();
+        if (email.isNotEmpty) {
+          final existing = await PbService().pb.collection('partner').getList(
+            filter: 'email = "$email" && partner_status = "draft"',
+            perPage: 1,
+          );
+          if (existing.items.isNotEmpty) {
+            _draftId = existing.items.first.id;
+          }
+        }
+      }
 
       if (_draftId == null) {
         final record = await PbService().pb.collection('partner').create(body: body).timeout(_timeout);
@@ -527,6 +596,73 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     }
   }
 
+  Future<String?> _verifyGstAndFill(String gst) async {
+    if (gst.length != 15) {
+      AppSnackBars.showError(context, 'Enter a valid 15-digit GST number');
+      return null;
+    }
+    try {
+      final res = await http
+          .get(
+            Uri.parse('${AppConfig.gstApiUrl}/$gst'),
+            headers: {'X-API-Key': AppConfig.gstApiKey},
+          )
+          .timeout(const Duration(seconds: 10));
+      if (!mounted) return null;
+      if (res.statusCode != 200) {
+        final errData = res.body.isNotEmpty ? jsonDecode(res.body) as Map<String, dynamic> : {};
+        final errMsg = errData['error'] as String? ?? 'GST verification failed';
+        AppSnackBars.showError(context, errMsg);
+        return null;
+      }
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      if (data['success'] != true) {
+        AppSnackBars.showError(context, 'GST verification failed');
+        return null;
+      }
+      final gstData = data['data'] as Map<String, dynamic>;
+      final pincode = gstData['pincode'] as String?;
+      DateTime? regDate;
+      final dateStr = gstData['registration_date'] as String?;
+      if (dateStr != null) {
+        final parts = dateStr.split('/');
+        if (parts.length == 3) {
+          try {
+            final d = int.parse(parts[0]);
+            final m = int.parse(parts[1]);
+            final y = int.parse(parts[2]);
+            regDate = DateTime.utc(y, m, d, 12);
+          } catch (_) {}
+        }
+      }
+      setState(() {
+        _gstController.text = gstData['gstin'] ?? gst;
+        _gstBillingController.text = gstData['gstin'] ?? gst;
+        _panController.text = gstData['pan'] ?? '';
+        _nameController.text = gstData['legal_name'] ?? '';
+        _entityType = gstData['constitution'] ?? '';
+        _gstFilingType = gstData['taxpayer_type'] ?? '';
+        _stateCode = gstData['state_code'] ?? '';
+        final nob = gstData['nature_of_business'];
+        _natureOfBusiness = nob is List ? nob.join(', ') : nob?.toString() ?? '';
+        _gstRegistrationDate = regDate;
+        _billingBusinessController.text = gstData['trade_name'] ?? '';
+        _billingAddressController.text = gstData['address'] ?? '';
+        _billingStateController.text = gstData['state'] ?? '';
+        _billingDistrictController.text = gstData['district'] ?? '';
+        _billingPincodeController.text = pincode ?? '';
+      });
+      if (pincode != null && pincode.length == 6) {
+        _fetchPincodeDetails(_billingPincodeController, _billingCityController, _billingDistrictController, _billingStateController);
+      }
+      if (mounted) AppSnackBars.showSuccess(context, 'GST verified: ${gstData['legal_name']}');
+      return gstData['legal_name'] as String?;
+    } catch (_) {
+      if (mounted) AppSnackBars.showError(context, 'Cannot reach server');
+      return null;
+    }
+  }
+
   Widget _buildSyncIndicator() {
     switch (_syncState) {
       case _SyncState.syncing:
@@ -597,13 +733,9 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildStepHeader('Business Profile', 'Core identification details'),
+            _buildStepHeader('Business Profile', 'Partner identification and contact'),
             const SizedBox(height: 24),
             _buildDatePicker(),
-            const SizedBox(height: 16),
-            _buildField('Partner Name *', _nameController, Icons.storefront_outlined, 'Required', textCapitalization: TextCapitalization.words),
-            const SizedBox(height: 16),
-            _buildField('Email Address *', _emailController, Icons.mail_outline_rounded, 'Required', keyboardType: TextInputType.emailAddress),
             const SizedBox(height: 16),
             AppPickerField(
               label: 'Partner Type',
@@ -621,19 +753,31 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
               },
             ),
             const SizedBox(height: 16),
-            AppPickerField(
-              label: 'Entity Type',
-              value: _toTitleCase(_entityType),
-              icon: Icons.category_outlined,
-              onTap: () async {
-                final result = await AppPickers.showSelectionSheet<String>(
-                  context: context,
-                  title: 'Select Entity Type',
-                  items: ['proprietor', 'partnership', 'company'],
-                  labelBuilder: _toTitleCase,
-                  selectedValue: _entityType,
-                );
-                if (result != null) setState(() => _entityType = result);
+            _buildField('Email Address *', _emailController, Icons.mail_outline_rounded, 'Required', keyboardType: TextInputType.emailAddress),
+            const SizedBox(height: 16),
+            _buildField('Key Person Name *', _personController, Icons.person_outline_rounded, 'Required', textCapitalization: TextCapitalization.words),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _mobileController,
+              keyboardType: TextInputType.phone,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ],
+              style: AppTypography.input,
+              decoration: InputDecoration(
+                labelText: 'Mobile Number *',
+                labelStyle: AppTypography.bodySmall,
+                prefixIcon: const Icon(Icons.phone_android_outlined, size: 18, color: AppColors.textSecondary),
+                filled: true,
+                fillColor: AppColors.background,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Required';
+                if (v.length != 10) return 'Enter a valid 10-digit mobile number';
+                return null;
               },
             ),
           ],
@@ -642,19 +786,70 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildStepHeader('Contact Details', 'Person responsible for communication'),
-            const SizedBox(height: 24),
-            _buildField('Key Person Name *', _personController, Icons.person_outline_rounded, 'Required', textCapitalization: TextCapitalization.words),
-            const SizedBox(height: 16),
-            _buildField('Mobile Number *', _mobileController, Icons.phone_android_outlined, 'Required', keyboardType: TextInputType.phone),
-          ],
-        );
-      case 2:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
             _buildStepHeader('Billing Address', 'Registered location for invoices'),
             const SizedBox(height: 24),
+            _buildField('GST No (auto-fill address)', _gstBillingController, Icons.receipt_outlined, null, suffix: _isFetchingGstBilling
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(width: 6, height: 6, child: CircularProgressIndicator(strokeWidth: 1, color: AppColors.primary)),
+                  )
+                : SizedBox(
+                    width: 36,
+                    height: 24,
+                    child: IconButton(
+                      icon: const Icon(Icons.search_rounded, size: 20),
+                      onPressed: () async {
+                        setState(() => _isFetchingGstBilling = true);
+                        await _verifyGstAndFill(_gstBillingController.text.trim());
+                        if (mounted) setState(() => _isFetchingGstBilling = false);
+                      },
+                      padding: EdgeInsets.zero,
+                    ),
+                  ), formatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+              TextInputFormatter.withFunction((o, n) => n.copyWith(text: n.text.toUpperCase())),
+              LengthLimitingTextInputFormatter(15),
+            ]),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _nameController,
+              readOnly: true,
+              style: AppTypography.input.copyWith(color: AppColors.textSecondary),
+              decoration: InputDecoration(
+                labelText: 'Legal Name',
+                labelStyle: AppTypography.bodySmall,
+                prefixIcon: const Icon(Icons.badge_outlined, size: 18, color: AppColors.textSecondary),
+                filled: true,
+                fillColor: AppColors.background,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.category_outlined, size: 18, color: AppColors.textSecondary),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Entity Type', style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted)),
+                      const SizedBox(height: 2),
+                      Text(_toTitleCase(_entityType), style: AppTypography.bodyMedium),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            _buildField('Partner Name', _billingBusinessController, Icons.business_outlined, null, textCapitalization: TextCapitalization.words),
+            const SizedBox(height: 16),
             _buildField('Street Address *', _billingAddressController, Icons.location_on_outlined, 'Required', maxLines: 2, textCapitalization: TextCapitalization.words),
             const SizedBox(height: 16),
             _buildField('Landmark', _billingLandmarkController, Icons.near_me_outlined, null, textCapitalization: TextCapitalization.words),
@@ -708,29 +903,19 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
             ],
           ],
         );
-      case 3:
+      case 2:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildStepHeader('Finance & Banking', 'Tax compliance and bank details'),
+            _buildStepHeader('Bank Details', 'Bank account information'),
             const SizedBox(height: 24),
-            _buildField('GST No', _gstController, Icons.receipt_outlined, null, formatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-              TextInputFormatter.withFunction((o, n) => n.copyWith(text: n.text.toUpperCase())),
-              LengthLimitingTextInputFormatter(15),
-            ]),
-            const SizedBox(height: 16),
-            _buildField('PAN No', _panController, Icons.credit_card_outlined, null, formatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-              TextInputFormatter.withFunction((o, n) => n.copyWith(text: n.text.toUpperCase())),
-              LengthLimitingTextInputFormatter(10),
-            ]),
-            const SizedBox(height: 24),
-            _buildField('Bank Name', _bankNameController, Icons.account_balance_outlined, null),
-            const SizedBox(height: 16),
             _buildField('Account Number', _bankAcController, Icons.format_list_numbered_rtl_outlined, null),
             const SizedBox(height: 16),
-            _buildField('IFSC Code', _bankIfscController, Icons.code_rounded, null, suffix: _isFetchingIfsc
+            _buildField('IFSC Code', _bankIfscController, Icons.code_rounded, null, formatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+              TextInputFormatter.withFunction((o, n) => n.copyWith(text: n.text.toUpperCase())),
+              LengthLimitingTextInputFormatter(11),
+            ], suffix: _isFetchingIfsc
                 ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 12),
                     child: SizedBox(width: 6, height: 6, child: CircularProgressIndicator(strokeWidth: 1, color: AppColors.primary)),
@@ -754,6 +939,137 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 16),
+            _buildField('Bank Name', _bankNameController, Icons.account_balance_outlined, null),
+            const SizedBox(height: 32),
+            Container(height: 1, color: AppColors.border),
+            const SizedBox(height: 24),
+            _buildStepHeader('GST Information', 'Tax compliance details (auto-filled)'),
+            const SizedBox(height: 24),
+            TextFormField(
+              controller: _gstController,
+              readOnly: true,
+              style: AppTypography.input.copyWith(color: AppColors.textSecondary),
+              decoration: InputDecoration(
+                labelText: 'GST No',
+                labelStyle: AppTypography.bodySmall,
+                prefixIcon: const Icon(Icons.receipt_outlined, size: 18, color: AppColors.textSecondary),
+                filled: true,
+                fillColor: AppColors.background,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _panController,
+              readOnly: true,
+              style: AppTypography.input.copyWith(color: AppColors.textSecondary),
+              decoration: InputDecoration(
+                labelText: 'PAN No',
+                labelStyle: AppTypography.bodySmall,
+                prefixIcon: const Icon(Icons.credit_card_outlined, size: 18, color: AppColors.textSecondary),
+                filled: true,
+                fillColor: AppColors.background,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.description_outlined, size: 18, color: AppColors.textSecondary),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('GST Filing Type', style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted)),
+                      const SizedBox(height: 2),
+                      Text(_gstFilingType.isNotEmpty ? _gstFilingType : '—', style: AppTypography.bodyMedium),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.pin_outlined, size: 18, color: AppColors.textSecondary),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('State Code', style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted)),
+                      const SizedBox(height: 2),
+                      Text(_stateCode.isNotEmpty ? _stateCode : '—', style: AppTypography.bodyMedium),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.work_outline, size: 18, color: AppColors.textSecondary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Nature of Business', style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted)),
+                        const SizedBox(height: 2),
+                        Text(_natureOfBusiness.isNotEmpty ? _natureOfBusiness : '—', style: AppTypography.bodyMedium),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.textSecondary),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('GST Registration Date', style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted)),
+                      const SizedBox(height: 2),
+                      Text(
+                        _gstRegistrationDate != null
+                            ? DateFormat('dd MMM yyyy').format(_gstRegistrationDate!)
+                            : '—',
+                        style: AppTypography.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         );
       default:
@@ -782,10 +1098,10 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
             const SizedBox(width: 96),
             Expanded(
               child: _CompactButton(
-                text: _currentStep == 3 ? (widget.isEditing ? 'SAVE' : 'FINISH') : 'CONTINUE',
+                text: _currentStep == 2 ? (widget.isEditing ? 'SAVE' : 'FINISH') : 'CONTINUE',
                 onPressed: () async {
                   if (_formKey.currentState!.validate()) {
-                    if (_currentStep < 3) {
+                    if (_currentStep < 2) {
                       _handleSaveData(isFinal: false, advanceStep: true);
                     } else if (widget.isEditing) {
                       _handleSaveData(isFinal: true);
@@ -975,7 +1291,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(
-        children: List.generate(4, (index) {
+        children: List.generate(3, (index) {
           final isActive = index <= _currentStep;
           return Expanded(
             child: Row(
@@ -992,7 +1308,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
                     child: Text('${index + 1}', style: TextStyle(color: isActive ? Colors.white : Colors.grey.shade400, fontSize: 11, fontWeight: FontWeight.w600)),
                   ),
                 ),
-                if (index < 3) Expanded(child: Container(height: 1.5, margin: const EdgeInsets.symmetric(horizontal: 4), color: isActive ? AppColors.primary : Colors.grey.shade300)),
+                if (index < 2) Expanded(child: Container(height: 1.5, margin: const EdgeInsets.symmetric(horizontal: 4), color: isActive ? AppColors.primary : Colors.grey.shade300)),
               ],
             ),
           );
@@ -1008,6 +1324,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     _emailController.dispose();
     _personController.dispose();
     _billingAddressController.dispose();
+    _billingBusinessController.dispose();
     _billingLandmarkController.dispose();
     _billingCityController.dispose();
     _billingDistrictController.dispose();
@@ -1024,6 +1341,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     _shippingStateFocus.dispose();
     _gstController.removeListener(_onGstChanged);
     _panController.removeListener(_onPanChanged);
+    _gstBillingController.dispose();
     _panController.dispose();
     _gstController.dispose();
     _bankNameController.dispose();
