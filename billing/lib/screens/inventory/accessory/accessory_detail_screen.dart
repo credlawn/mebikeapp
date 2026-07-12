@@ -32,9 +32,9 @@ class _AccessoryDetailScreenState extends ConsumerState<AccessoryDetailScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => ref.invalidate(allAccessoriesProvider));
       setState(() => _item = Accessory(
         id: _item.id, collectionId: _item.collectionId,
-        itemCode: _item.itemCode, name: _item.name, status: newStatus,
-        category: _item.category, mrp: _item.mrp, weight: _item.weight,
-        gstSlab: _item.gstSlab, hsnCode: _item.hsnCode,
+        itemCode: _item.itemCode, name: _item.name, fullName: _item.fullName, status: newStatus,
+        variant: _item.variant, sellingPrice: _item.sellingPrice,
+        weight: _item.weight, gstSlab: _item.gstSlab, hsnCode: _item.hsnCode,
         created: _item.created, updated: _item.updated,
       ));
       if (mounted) AppSnackBars.showSuccess(context, newStatus == 'active' ? 'Activated' : 'Deactivated');
@@ -50,19 +50,20 @@ class _AccessoryDetailScreenState extends ConsumerState<AccessoryDetailScreen> {
     final isActive = _item.status == 'active';
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(_item.name)),
+        appBar: AppBar(title: Text(_item.fullName)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             _buildSection('Accessory Info', [
               _buildRow('Item Code', _item.itemCode),
+              _buildRow('Full Name', _item.fullName),
               _buildRow('Name', _item.name),
-              if (_item.category.isNotEmpty) _buildRow('Category', _toTitleCase(_item.category)),
+              if (_item.variant.isNotEmpty) _buildRow('Variant', _item.variant),
             ]),
             const SizedBox(height: 12),
             _buildSection('Pricing & Compliance', [
-              if (_item.mrp > 0) _buildRow('MRP', '₹${_item.mrp.toStringAsFixed(0)}'),
+              if (_item.sellingPrice > 0) _buildRow('Selling Price', '₹${_item.sellingPrice.toStringAsFixed(0)}'),
               if (_item.weight > 0) _buildRow('Weight', '${_item.weight % 1 == 0 ? _item.weight.toInt() : _item.weight} kg'),
               _buildRow('GST Slab', '${_item.gstSlab}%'),
               if (_item.hsnCode.isNotEmpty) _buildRow('HSN Code', _item.hsnCode),
@@ -148,10 +149,5 @@ class _AccessoryDetailScreenState extends ConsumerState<AccessoryDetailScreen> {
         ],
       ),
     );
-  }
-
-  String _toTitleCase(String text) {
-    if (text.isEmpty) return text;
-    return text[0].toUpperCase() + text.substring(1).toLowerCase();
   }
 }
