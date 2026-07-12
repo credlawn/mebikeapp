@@ -1,0 +1,71 @@
+class Battery {
+  final String id;
+  final String collectionId;
+  final String itemCode;
+  final String name;
+  final String volt;
+  final String amp;
+  final String chemistry;
+  final String color;
+  final double mrp;
+  final double weight;
+  final int gstSlab;
+  final String hsnCode;
+  final String status;
+  final DateTime created;
+  final DateTime updated;
+
+  Battery({
+    required this.id,
+    required this.collectionId,
+    required this.itemCode,
+    required this.name,
+    this.volt = '',
+    this.amp = '',
+    this.chemistry = '',
+    this.color = '',
+    this.mrp = 0,
+    this.weight = 0,
+    this.gstSlab = 0,
+    this.hsnCode = '',
+    this.status = 'active',
+    required this.created,
+    required this.updated,
+  });
+
+  factory Battery.fromJson(Map<String, dynamic> json) {
+    return Battery(
+      id: json['id'] ?? '',
+      collectionId: json['collectionId'] ?? '',
+      itemCode: (json['item_code'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      volt: (json['volt'] ?? '').toString(),
+      amp: (json['amp'] ?? '').toString(),
+      chemistry: (json['chemistry'] ?? '').toString(),
+      color: (json['color'] ?? '').toString(),
+      mrp: (json['mrp'] is String ? double.tryParse(json['mrp']) ?? 0 : (json['mrp'] ?? 0)).toDouble(),
+      weight: (json['weight'] is String ? double.tryParse(json['weight']) ?? 0 : (json['weight'] ?? 0)).toDouble(),
+      gstSlab: (json['gst_slab'] ?? 0).toInt(),
+      hsnCode: (json['hsn_code'] ?? '').toString(),
+      status: (json['status'] ?? 'active').toString(),
+      created: DateTime.parse(json['created']),
+      updated: DateTime.parse(json['updated']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'item_code': itemCode,
+      'name': name,
+      'volt': volt.isEmpty ? null : volt,
+      'amp': amp.isEmpty ? null : amp,
+      'chemistry': chemistry.isEmpty ? null : chemistry,
+      'color': color.isEmpty ? null : color,
+      'mrp': mrp,
+      'weight': weight,
+      'gst_slab': gstSlab,
+      'hsn_code': hsnCode.isEmpty ? null : hsnCode,
+      'status': status,
+    };
+  }
+}

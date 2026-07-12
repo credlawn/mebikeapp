@@ -119,7 +119,7 @@ class _CompanyDashboardState extends ConsumerState<CompanyDashboard> with Single
                     subtitle: 'Items & Masters',
                     icon: Icons.inventory_2_outlined,
                     color: Colors.blue,
-                    onTap: () => Navigator.pushNamed(context, '/inventory-list'),
+                    onTap: () => Navigator.pushNamed(context, '/inventory-dashboard'),
                   ),
                   const ModuleCard(
                     title: 'Billing',

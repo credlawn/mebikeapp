@@ -7,10 +7,12 @@ import 'screens/auth/app_lock_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/partner/partner_list_screen.dart';
 import 'screens/partner/add_partner_screen.dart';
-import 'screens/inventory/inventory_list_screen.dart';
-import 'screens/inventory/add_inventory_screen.dart';
-import 'screens/inventory/inventory_master_screen.dart';
-import 'screens/inventory/item_type_config_screen.dart';
+import 'screens/inventory/inventory_dashboard_screen.dart';
+import 'screens/inventory/vehicle/vehicle_list_screen.dart';
+import 'screens/inventory/battery/battery_list_screen.dart';
+import 'screens/inventory/motor/motor_list_screen.dart';
+import 'screens/inventory/accessory/accessory_list_screen.dart';
+import 'screens/inventory/charger/charger_list_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() async {
@@ -107,29 +109,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       ),
       home: const SplashScreen(),
       routes: {
+        '/inventory-dashboard': (context) => const InventoryDashboardScreen(),
+        '/vehicle-list': (context) => const VehicleListScreen(),
+        '/battery-list': (context) => const BatteryListScreen(),
+        '/motor-list': (context) => const MotorListScreen(),
+        '/accessory-list': (context) => const AccessoryListScreen(),
+        '/charger-list': (context) => const ChargerListScreen(),
         '/partner-list': (context) => const PartnerListScreen(),
         '/add-partner': (context) => const AddPartnerScreen(),
-        '/inventory-list': (context) => const InventoryListScreen(),
-        '/add-inventory': (context) => const AddInventoryScreen(),
-        '/item-types': (context) => const InventoryMasterScreen(
-          title: 'Item Types',
-          collectionName: 'item_type',
-          masterType: InventoryMasterType.itemType,
-          icon: Icons.category_outlined,
-        ),
-        '/item-colors': (context) => const InventoryMasterScreen(
-          title: 'Item Colors',
-          collectionName: 'item_color',
-          masterType: InventoryMasterType.itemColor,
-          icon: Icons.palette_outlined,
-        ),
-        '/item-variants': (context) => const InventoryMasterScreen(
-          title: 'Item Variants',
-          collectionName: 'item_variant',
-          masterType: InventoryMasterType.itemVariant,
-          icon: Icons.tune_outlined,
-        ),
-        '/item-type-config': (context) => const ItemTypeConfigScreen(),
       },
     );
   }
