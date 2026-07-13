@@ -1,11 +1,79 @@
 import 'package:flutter/material.dart';
 import '../../models/invoice_model.dart';
+import '../../pb_service.dart';
+import '../../theme/app_snackbars.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 
 class InvoiceDetailScreen extends StatelessWidget {
   final Invoice invoice;
   const InvoiceDetailScreen({super.key, required this.invoice});
+
+  void _cancelInvoice(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56, height: 56,
+              decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1), shape: BoxShape.circle),
+              child: const Icon(Icons.cancel_outlined, color: Colors.orange, size: 28),
+            ),
+            const SizedBox(height: 20),
+            Text('Cancel Invoice', style: AppTypography.h2.copyWith(fontSize: 18)),
+            const SizedBox(height: 12),
+            Text(
+              'Cancel "${invoice.invoiceNo}"?',
+              style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary, width: 1.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text('No', style: AppTypography.button.copyWith(color: AppColors.primary)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange, foregroundColor: Colors.white, elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text('Cancel Invoice'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await PbService().pb.collection('invoice').update(invoice.id, body: {'status': 'cancelled'});
+      if (context.mounted) {
+        AppSnackBars.showSuccess(context, 'Invoice cancelled');
+        Navigator.of(context).pop();
+      }
+    } catch (_) {
+      if (context.mounted) AppSnackBars.showError(context, 'Failed to cancel');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +129,23 @@ class InvoiceDetailScreen extends StatelessWidget {
             _buildTotalsCard(),
             const SizedBox(height: 24),
             if (invoice.notes.isNotEmpty) _buildNotes(),
+            if (invoice.status == 'confirmed') ...[
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _cancelInvoice(context),
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: const Text('Cancel Invoice'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange,
+                    side: const BorderSide(color: Colors.orange),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

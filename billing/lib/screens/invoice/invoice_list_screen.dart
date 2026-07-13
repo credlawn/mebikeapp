@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/invoice_model.dart';
 import '../../providers/invoice_provider.dart';
 import '../../pb_service.dart';
 import '../../theme/colors.dart';
@@ -56,23 +57,81 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
     }
   }
 
-  void _confirmDelete(String id, String invoiceNo) {
-    showDialog(
+  Future<void> _cancelInvoice(Invoice inv) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+              width: 56, height: 56,
+              decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.1), shape: BoxShape.circle),
+              child: const Icon(Icons.cancel_outlined, color: Colors.orange, size: 28),
+            ),
+            const SizedBox(height: 20),
+            Text('Cancel Invoice', style: AppTypography.h2.copyWith(fontSize: 18)),
+            const SizedBox(height: 12),
+            Text(
+              'Cancel "${inv.invoiceNo.isNotEmpty ? inv.invoiceNo : 'Draft'}"?',
+              style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary, width: 1.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text('No', style: AppTypography.button.copyWith(color: AppColors.primary)),
+                ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange, foregroundColor: Colors.white, elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text('Cancel Invoice'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await PbService().pb.collection('invoice').update(inv.id, body: {'status': 'cancelled'});
+      ref.invalidate(allInvoicesProvider);
+      if (mounted) AppSnackBars.showSuccess(context, 'Invoice cancelled');
+    } catch (_) {
+      if (mounted) AppSnackBars.showError(context, 'Failed to cancel');
+    }
+  }
+
+  void _confirmDelete(String id, String invoiceNo) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56, height: 56,
+              decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.1), shape: BoxShape.circle),
               child: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 28),
             ),
             const SizedBox(height: 20),
@@ -85,7 +144,6 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
             ),
           ],
         ),
-        actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
         actions: [
           Row(
             children: [
@@ -121,6 +179,65 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  void _showInvoiceActions(Invoice inv) {
+    final no = inv.invoiceNo.isNotEmpty ? inv.invoiceNo : 'Draft';
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Text(no, style: AppTypography.h2.copyWith(fontSize: 16)),
+              ),
+              const Divider(),
+              if (inv.status == 'confirmed' && !inv.locked) ...[
+                ListTile(
+                  leading: const Icon(Icons.cancel_outlined, color: Colors.orange),
+                  title: Text('Cancel Invoice', style: AppTypography.bodyLarge),
+                  onTap: () { Navigator.of(ctx).pop(); _cancelInvoice(inv); },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                  title: Text('Delete Invoice', style: AppTypography.bodyLarge),
+                  onTap: () { Navigator.of(ctx).pop(); _confirmDelete(inv.id, no); },
+                ),
+              ],
+              if (inv.status == 'confirmed' && inv.locked)
+                ListTile(
+                  leading: const Icon(Icons.lock_outline_rounded, color: AppColors.textMuted),
+                  title: Text('Locked — cannot modify', style: AppTypography.bodyLarge.copyWith(color: AppColors.textMuted)),
+                ),
+              if (inv.status == 'draft')
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                  title: Text('Delete Draft', style: AppTypography.bodyLarge),
+                  onTap: () { Navigator.of(ctx).pop(); _confirmDelete(inv.id, no); },
+                ),
+              if (inv.status == 'cancelled')
+                ListTile(
+                  leading: Icon(Icons.block_rounded, color: AppColors.textMuted),
+                  title: Text('Cancelled — permanent record', style: AppTypography.bodyLarge.copyWith(color: AppColors.textMuted)),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -220,6 +337,10 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
               statusColor = AppColors.success;
               statusLabel = 'Confirmed';
               break;
+            case 'cancelled':
+              statusColor = AppColors.error;
+              statusLabel = 'Cancelled';
+              break;
             default:
               statusColor = Colors.orange;
               statusLabel = 'Draft';
@@ -241,7 +362,7 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
                 context,
                 MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoice: inv)),
               ),
-              onLongPress: () => _confirmDelete(inv.id, inv.invoiceNo.isNotEmpty ? inv.invoiceNo : 'Draft'),
+              onLongPress: () => _showInvoiceActions(inv),
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(

@@ -19,6 +19,7 @@ func main() {
 	})
 
 	pb_hooks.RegisterAuthHooks(app)
+	pb_hooks.RegisterInvoiceHooks(app)
 
 	if err := app.Start(); err != nil {
 		log.Fatal(err)

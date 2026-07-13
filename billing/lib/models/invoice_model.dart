@@ -119,6 +119,7 @@ class Invoice {
   final double paidAmount;
   final double balanceAmount;
   final String status;
+  final bool locked;
   final String notes;
   final DateTime created;
   final DateTime updated;
@@ -156,6 +157,7 @@ class Invoice {
     this.paidAmount = 0,
     this.balanceAmount = 0,
     this.status = 'draft',
+    this.locked = false,
     this.notes = '',
     required this.created,
     required this.updated,
@@ -212,6 +214,7 @@ class Invoice {
       paidAmount: (json['paid_amount'] ?? 0).toDouble(),
       balanceAmount: (json['balance_amount'] ?? 0).toDouble(),
       status: json['status'] ?? 'draft',
+      locked: json['locked'] ?? false,
       notes: json['notes'] ?? '',
       created: DateTime.parse(json['created']),
       updated: DateTime.parse(json['updated']),
@@ -248,6 +251,7 @@ class Invoice {
     'paid_amount': paidAmount,
     'balance_amount': balanceAmount,
     'status': status,
+    'locked': locked,
     'notes': notes,
   };
 }
