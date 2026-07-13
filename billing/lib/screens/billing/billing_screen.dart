@@ -790,18 +790,21 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
             const SizedBox(height: 8),
             Row(
               children: [
-                _itemDetail('Qty', item.quantity.toString()),
+                _itemDetail('Qty', item.quantity.toInt().toString()),
                 const SizedBox(width: 16),
                 _itemDetail('Rate', '₹${item.unitPrice.toStringAsFixed(0)}'),
                 const SizedBox(width: 16),
-                _itemDetail('Disc', '${item.discountPercent.toStringAsFixed(0)}%'),
+                _itemDetail('GST', '${item.gstSlab}%'),
                 const Spacer(),
                 Text('₹${item.total.toStringAsFixed(2)}', style: AppTypography.h3.copyWith(color: AppColors.primary, fontSize: 14)),
               ],
             ),
-            Text(
-              'HSN: ${item.hsnCode} • GST: ${item.gstSlab}% • Taxable: ₹${item.taxableValue.toStringAsFixed(2)}',
-              style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'Taxable: ₹${item.taxableValue.toStringAsFixed(2)}',
+                style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted),
+              ),
             ),
           ],
         ),
