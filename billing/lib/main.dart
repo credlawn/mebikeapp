@@ -13,6 +13,10 @@ import 'screens/inventory/battery/battery_list_screen.dart';
 import 'screens/inventory/motor/motor_list_screen.dart';
 import 'screens/inventory/accessory/accessory_list_screen.dart';
 import 'screens/inventory/charger/charger_list_screen.dart';
+import 'screens/settings/settings_screen.dart';
+import 'screens/company/company_screen.dart';
+import 'screens/customer/customer_list_screen.dart';
+import 'screens/customer/add_customer_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() async {
@@ -117,6 +121,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         '/charger-list': (context) => const ChargerListScreen(),
         '/partner-list': (context) => const PartnerListScreen(),
         '/add-partner': (context) => const AddPartnerScreen(),
+        '/settings': (context) => const SettingsScreen(),
+        '/company-profile': (context) => const CompanyScreen(),
+        '/customer-list': (context) => const CustomerListScreen(),
+        '/add-customer': (context) => const AddCustomerScreen(),
       },
     );
   }

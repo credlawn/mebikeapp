@@ -5,8 +5,6 @@ import '../../providers/connectivity_provider.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../theme/app_snackbars.dart';
-import '../../pb_service.dart';
-import '../../login_screen.dart';
 
 class CompanyDashboard extends ConsumerStatefulWidget {
   const CompanyDashboard({super.key});
@@ -45,14 +43,6 @@ class _CompanyDashboardState extends ConsumerState<CompanyDashboard> with Single
     }
   }
 
-  void _handleLogout() {
-    PbService().pb.authStore.clear();
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final partnersAsync = ref.watch(allPartnersProvider);
@@ -76,9 +66,9 @@ class _CompanyDashboardState extends ConsumerState<CompanyDashboard> with Single
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-            onPressed: _handleLogout,
-            tooltip: 'Logout',
+            icon: const Icon(Icons.settings_rounded, color: AppColors.textSecondary),
+            onPressed: () => Navigator.pushNamed(context, '/settings'),
+            tooltip: 'Settings',
           ),
         ],
       ),
@@ -113,6 +103,13 @@ class _CompanyDashboardState extends ConsumerState<CompanyDashboard> with Single
                     color: AppColors.primary,
                     badge: activeCount > 0 ? '$activeCount Active' : null,
                     onTap: () => Navigator.pushNamed(context, '/partner-list'),
+                  ),
+                  ModuleCard(
+                    title: 'Customers',
+                    subtitle: 'Retail & GST billing parties',
+                    icon: Icons.people_outline_rounded,
+                    color: const Color(0xFF0D9488),
+                    onTap: () => Navigator.pushNamed(context, '/customer-list'),
                   ),
                   ModuleCard(
                     title: 'Inventory',
