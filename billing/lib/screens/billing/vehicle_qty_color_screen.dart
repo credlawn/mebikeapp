@@ -1,9 +1,54 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../pb_service.dart';
 import '../../theme/app_snackbars.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
+
+const _commonColors = {
+  'RED': '#DC2626',
+  'BLUE': '#2563EB',
+  'GREEN': '#16A34A',
+  'BLACK': '#000000',
+  'WHITE': '#FFFFFF',
+  'SILVER': '#9CA3AF',
+  'GREY': '#6B7280',
+  'ORANGE': '#EA580C',
+  'PURPLE': '#9333EA',
+  'BROWN': '#92400E',
+  'GOLD': '#D97706',
+  'GOLDEN': '#D4A017',
+  'YELLOW': '#EAB308',
+  'PINK': '#EC4899',
+  'MAROON': '#991B1B',
+  'WINE': '#722F37',
+  'NAVY': '#1E3A5F',
+  'TEAL': '#0D9488',
+  'LIME': '#65A30D',
+  'INDIGO': '#4F46E5',
+  'CYAN': '#06B6D4',
+  'VIOLET': '#8B5CF6',
+};
+
+Color _hexToColor(String hex) {
+  final h = hex.replaceFirst('#', '');
+  return Color(int.parse('FF$h', radix: 16));
+}
+
+class _HexInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue old, TextEditingValue next) {
+    if (next.text.isEmpty) return next;
+    if (!next.text.startsWith('#')) {
+      return TextEditingValue(
+        text: '#${next.text}',
+        selection: TextSelection.collapsed(offset: next.text.length + 1),
+      );
+    }
+    return next;
+  }
+}
 
 class VehicleQtyColorScreen extends StatefulWidget {
   final dynamic vehicleRecord;
@@ -15,8 +60,9 @@ class VehicleQtyColorScreen extends StatefulWidget {
 
 class _ColorEntry {
   final String name;
+  final String hex;
   int qty;
-  _ColorEntry({required this.name, this.qty = 0});
+  _ColorEntry({required this.name, this.hex = '', this.qty = 0});
 }
 
 class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
@@ -69,72 +115,160 @@ class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
     final String nn = widget.vehicleRecord.getStringValue('name');
     final String vName = fn.isNotEmpty ? fn : nn;
 
-    final confirmed = await showDialog<bool>(
+    String? pickedHex;
+    final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-        actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-        content: SizedBox(
-          width: MediaQuery.of(ctx).size.width - 88,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 64, height: 64,
-                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.color_lens_outlined, color: AppColors.primary, size: 32),
-              ),
-              const SizedBox(height: 24),
-              Text('Add "$color"', style: AppTypography.h2.copyWith(fontSize: 20), textAlign: TextAlign.center),
-              const SizedBox(height: 8),
-              Text(
-                'to $vName?',
-                textAlign: TextAlign.center,
-                style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
-              ),
-            ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+          contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          content: SizedBox(
+            width: MediaQuery.of(ctx).size.width - 88,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 48, height: 48,
+                  decoration: BoxDecoration(
+                    color: pickedHex != null ? _hexToColor(pickedHex!) : AppColors.primary.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: pickedHex == null
+                      ? const Icon(Icons.color_lens_outlined, color: AppColors.primary, size: 24)
+                      : null,
+                ),
+                const SizedBox(height: 20),
+                Text('Add "$color"', style: AppTypography.h2.copyWith(fontSize: 20), textAlign: TextAlign.center),
+                const SizedBox(height: 4),
+                Text(
+                  'to $vName?',
+                  textAlign: TextAlign.center,
+                  style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 20),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Pick a shade', style: AppTypography.bodySmall.copyWith(fontSize: 11, color: AppColors.textMuted)),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 10, runSpacing: 10,
+                  children: _commonColors.entries.map((e) {
+                    final selected = pickedHex == e.value;
+                    return GestureDetector(
+                      onTap: () => setDlgState(() => pickedHex = e.value),
+                      child: Container(
+                        width: 36, height: 36,
+                        decoration: BoxDecoration(
+                          color: _hexToColor(e.value),
+                          borderRadius: BorderRadius.circular(8),
+                          border: selected
+                              ? Border.all(color: AppColors.primary, width: 3)
+                              : Border.all(color: AppColors.border, width: 1),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'FF5733',
+                          hintStyle: AppTypography.bodySmall.copyWith(fontSize: 12),
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          isDense: true,
+                        ),
+                        style: AppTypography.bodyMedium.copyWith(fontSize: 13),
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[#0-9A-Fa-f]')),
+                          _HexInputFormatter(),
+                          LengthLimitingTextInputFormatter(7),
+                        ],
+                        onChanged: (v) {
+                          final h = v.trim().toUpperCase();
+                          if (h.length == 7 && RegExp(r'^#[0-9A-F]{6}$').hasMatch(h)) {
+                            setDlgState(() => pickedHex = h);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: pickedHex != null ? _hexToColor(pickedHex!) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary, width: 1.2),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(ctx).pop(''),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary, width: 1.2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: Text('Skip', style: AppTypography.button.copyWith(color: AppColors.primary)),
                   ),
-                  child: Text('Cancel', style: AppTypography.button.copyWith(color: AppColors.primary)),
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(ctx).pop(true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary, foregroundColor: Colors.white, elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(pickedHex ?? ''),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary, foregroundColor: Colors.white, elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: Text('Add', style: AppTypography.button.copyWith(color: Colors.white)),
                   ),
-                  child: Text('Add', style: AppTypography.button.copyWith(color: Colors.white)),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
-    if (confirmed != true) return;
+    if (result == null) return;
+    final hex = result;
+
     try {
       final existing = widget.vehicleRecord.getStringValue('color');
       final updated = existing.isEmpty ? color : '$existing,$color';
+
+      final String existingHexRaw = widget.vehicleRecord.getStringValue('color_hex');
+      Map<String, dynamic> hexMap = {};
+      if (existingHexRaw.isNotEmpty) {
+        try { hexMap = jsonDecode(existingHexRaw) as Map<String, dynamic>; } catch (_) {}
+      }
+      if (hex.isNotEmpty) hexMap[color] = hex;
+
       await PbService().pb.collection('vehicle').update(
         widget.vehicleRecord.id,
-        body: {'color': updated},
+        body: {
+          'color': updated,
+          'color_hex': jsonEncode(hexMap),
+        },
       );
       _allColors.add(color);
       if (mounted) AppSnackBars.showSuccess(context, 'Added "$color"');
@@ -172,13 +306,17 @@ class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
     _colorFocus.unfocus();
   }
 
+  String _hexFor(String name) => _commonColors[name.toUpperCase()] ?? '';
+
   void _addColor() {
     final color = _colorSearchCtrl.text.trim();
     if (color.isEmpty || !_availableColors.any((c) => c.toLowerCase() == color.toLowerCase())) return;
     final qty = int.tryParse(_addQtyCtrl.text) ?? 1;
     if (qty <= 0 || qty > _remaining) return;
+    final String uc = color.toUpperCase();
+    final String hex = _hexFor(uc);
     setState(() {
-      _selected.add(_ColorEntry(name: color, qty: qty));
+      _selected.add(_ColorEntry(name: color, hex: hex, qty: qty));
       _colorSearchCtrl.clear();
       _addQtyCtrl.clear();
       _suggestions = [];
@@ -260,8 +398,8 @@ class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ),
-                    ],
+                ),
+              ],
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -303,9 +441,17 @@ class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
                                   separatorBuilder: (_, _) => const Divider(height: 1, indent: 16),
                                   itemBuilder: (_, i) {
                                     final option = _suggestions[i];
+                                    final hex = _hexFor(option);
                                     return ListTile(
                                       dense: true,
                                       visualDensity: VisualDensity.compact,
+                                      leading: Container(
+                                        width: 16, height: 16,
+                                        decoration: BoxDecoration(
+                                          color: hex.isNotEmpty ? _hexToColor(hex) : AppColors.textMuted,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                      ),
                                       title: Text(option, style: AppTypography.bodyMedium.copyWith(fontSize: 13)),
                                       onTap: () => _selectSuggestion(option),
                                     );
@@ -410,10 +556,10 @@ class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
                     child: Row(
                       children: [
                         Container(
-                          width: 10, height: 10,
+                          width: 14, height: 14,
                           decoration: BoxDecoration(
-                            color: AppColors.textMuted,
-                            borderRadius: BorderRadius.circular(2),
+                            color: e.hex.isNotEmpty ? _hexToColor(e.hex) : AppColors.textMuted,
+                            borderRadius: BorderRadius.circular(3),
                           ),
                         ),
                         const SizedBox(width: 10),

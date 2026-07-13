@@ -323,9 +323,8 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
     final unitRateOf = <String, double>{};
     for (final b in batteryCombos) {
       final rec = b['batteryRecord'] as dynamic;
-      final qty = b['qty'] as int;
-      final totalPrice = b['totalPrice'] as double;
-      unitRateOf[rec.id] = totalPrice / qty;
+      final unitPrice = b['unitPrice'] as double;
+      unitRateOf[rec.id] = unitPrice;
     }
 
     while (true) {
