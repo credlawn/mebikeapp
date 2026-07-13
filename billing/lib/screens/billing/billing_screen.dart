@@ -10,6 +10,7 @@ import '../../pb_service.dart';
 import '../../theme/app_snackbars.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
+import 'item_select_screen.dart';
 
 class BillingScreen extends ConsumerStatefulWidget {
   final String invoiceType;
@@ -63,6 +64,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       _partyMobile = p.mobileNo;
       _partyGst = p.gstNo;
       _partyStateCode = p.stateCode;
+      _partyAddress = p.billingAddress;
     }
     _loadInvoiceNo();
   }
@@ -126,17 +128,48 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Select Item Type', style: AppTypography.h2),
-            const SizedBox(height: 16),
-            ...['vehicle', 'battery', 'motor', 'accessory', 'charger'].map((t) => ListTile(
-              title: Text(t[0].toUpperCase() + t.substring(1), style: AppTypography.bodyLarge),
-              leading: Icon(_iconForType(t), color: _colorForType(t)),
-              onTap: () => Navigator.of(ctx).pop(t),
-            )),
-          ],
+        content: SizedBox(
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Text('Select Item Type', style: AppTypography.h2),
+              const SizedBox(height: 20),
+              ...['vehicle', 'battery', 'motor', 'accessory', 'charger'].map((t) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: InkWell(
+                  onTap: () => Navigator.of(ctx).pop(t),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: _colorForType(t).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _colorForType(t).withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(_iconForType(t), color: _colorForType(t), size: 20),
+                        const SizedBox(width: 10),
+                        Text(
+                          t[0].toUpperCase() + t.substring(1),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: _colorForType(t),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )),
+              const SizedBox(height: 4),
+            ],
+          ),
         ),
       ),
     );
@@ -154,49 +187,13 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
         return;
       }
 
-      final names = records.map((r) {
-        final name = r.getStringValue('full_name').isNotEmpty
-            ? r.getStringValue('full_name')
-            : r.getStringValue('name');
-        final price = r.getDoubleValue('selling_price');
-        final code = r.getStringValue('item_code');
-        return '$name (₹${price.toStringAsFixed(0)}) - $code';
-      }).toList();
-
-      final selected = await showDialog<int>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Select ${type[0].toUpperCase() + type.substring(1)}', style: AppTypography.h2),
-                const SizedBox(height: 16),
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: names.length,
-                    itemBuilder: (_, i) => ListTile(
-                      title: Text(names[i], style: AppTypography.bodyMedium),
-                      onTap: () => Navigator.of(ctx).pop(i),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+      final rec = await Navigator.of(context).push<dynamic>(
+        MaterialPageRoute(
+          builder: (_) => ItemSelectScreen(itemType: type),
         ),
       );
 
-      if (selected == null || !mounted) {
-        return;
-      }
-
-      final rec = records[selected];
+      if (rec == null || !mounted) return;
       final hsn = rec.getStringValue('hsn_code');
       final gstSlab = rec.getDoubleValue('gst_slab').toInt();
       final price = rec.getDoubleValue('selling_price');
