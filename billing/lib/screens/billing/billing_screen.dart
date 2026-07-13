@@ -211,71 +211,137 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       }
 
       final hsn = rec.getStringValue('hsn_code');
-      final gstSlab = rec.getDoubleValue('gst_slab').toInt();
-      final price = rec.getDoubleValue('selling_price');
+      final int gstSlab = rec.getDoubleValue('gst_slab').toInt();
       final code = rec.getStringValue('item_code');
-      final name = rec.getStringValue('full_name').isNotEmpty
-          ? rec.getStringValue('full_name')
-          : rec.getStringValue('name');
-
-      final item = InvoiceItem(
-        itemType: type,
-        itemId: rec.id,
-        itemCode: code,
-        itemName: name,
-        hsnCode: hsn,
-        gstSlab: gstSlab,
-        quantity: 1,
-        unitPrice: price,
-      );
+      final String fn = rec.getStringValue('full_name');
+      final String nn = rec.getStringValue('name');
+      final String name = fn.isNotEmpty ? fn : nn;
 
       final qtyCtrl = TextEditingController(text: '1');
-      final discCtrl = TextEditingController(text: '0');
+      final priceCtrl = TextEditingController();
 
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          content: StatefulBuilder(
-            builder: (ctx, setDlgState) => Column(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 80),
+          contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          content: SizedBox(
+            width: MediaQuery.of(ctx).size.width - 88,
+            child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Add Item', style: AppTypography.h2),
-                const SizedBox(height: 16),
-                Text(name, style: AppTypography.h3),
-                const SizedBox(height: 4),
-                Text('₹${price.toStringAsFixed(2)} • HSN: $hsn • GST: $gstSlab%', style: AppTypography.bodySmall),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: qtyCtrl,
-                  decoration: const InputDecoration(labelText: 'Quantity', border: OutlineInputBorder()),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                Container(
+                  width: 48, height: 48,
+                  decoration: BoxDecoration(
+                    color: _colorForType(type).withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(_iconForType(type), color: _colorForType(type), size: 24),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: discCtrl,
-                  decoration: const InputDecoration(labelText: 'Discount (%)', border: OutlineInputBorder()),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                const SizedBox(height: 16),
+                Text(name, style: AppTypography.h3, textAlign: TextAlign.center),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _colorForType(type).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'HSN: $hsn  •  GST: $gstSlab%',
+                    style: AppTypography.bodySmall.copyWith(fontSize: 10, color: _colorForType(type)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: qtyCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Quantity',
+                          labelStyle: AppTypography.bodySmall,
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                        style: AppTypography.input,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: priceCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Per Unit Price',
+                          labelStyle: AppTypography.bodySmall,
+                          prefixText: '₹ ',
+                          prefixStyle: AppTypography.bodySmall,
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        ),
+                        style: AppTypography.input,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-            ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Add')),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary, width: 1.2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: Text('Cancel', style: AppTypography.button.copyWith(color: AppColors.primary)),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary, foregroundColor: Colors.white, elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: Text('Add', style: AppTypography.button.copyWith(color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       );
 
       if (confirmed == true && mounted) {
-        item.quantity = double.tryParse(qtyCtrl.text) ?? 1;
-        item.discountPercent = double.tryParse(discCtrl.text) ?? 0;
-        _items.add(item);
+        final qty = double.tryParse(qtyCtrl.text) ?? 1;
+        final perUnitPrice = double.tryParse(priceCtrl.text) ?? 0;
+        _items.add(InvoiceItem(
+          itemType: type,
+          itemId: rec.id,
+          itemCode: code,
+          itemName: name,
+          hsnCode: hsn,
+          gstSlab: gstSlab,
+          quantity: qty,
+          unitPrice: perUnitPrice,
+          isGstInclusive: true,
+        ));
         _recalculateItem(_items.length - 1);
       }
     } catch (_) {
