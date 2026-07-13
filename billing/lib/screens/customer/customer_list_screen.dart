@@ -207,45 +207,45 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen>
         itemCount: customers.length,
         itemBuilder: (_, i) {
           final c = customers[i];
-          final displayName = c.customerName.isNotEmpty
+          final name = c.customerName.isNotEmpty
               ? c.customerName
               : (c.businessName.isNotEmpty ? c.businessName : c.mobileNo);
-          final subtitle = c.gstNo.isNotEmpty ? 'GST: ${c.gstNo}' : c.mobileNo;
-          final typeLabel = c.customerType == 'normal'
-              ? 'Normal'
-              : (c.customerType == 'gst_individual' ? 'GST Ind' : 'GST Biz');
-          final typeColor = c.customerType == 'normal'
-              ? Colors.grey
-              : (c.customerType == 'gst_individual' ? Colors.orange : AppColors.primary);
+          final addressParts = c.gstNo.isNotEmpty
+              ? c.address
+              : [c.address, c.city, c.district, c.state]
+                  .where((e) => e.isNotEmpty).join(', ') + (c.pincode.isNotEmpty ? ' - ${c.pincode}' : '');
+          final typeLabel = c.customerType == 'normal' ? 'Non GST' : 'GST';
 
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: AppColors.border),
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
             ),
             child: InkWell(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               onTap: () {},
-              onLongPress: () => _confirmDelete(c.id, displayName),
+              onLongPress: () => _confirmDelete(c.id, name),
               child: Padding(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 40,
-                      height: 40,
+                      width: 32,
+                      height: 32,
                       decoration: BoxDecoration(
-                        color: typeColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        color: const Color(0xFF0D9488).withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Center(
                         child: Text(
                           '${i + 1}',
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: typeColor,
-                            fontWeight: FontWeight.bold,
+                          style: TextStyle(
+                            color: const Color(0xFF0D9488),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
                           ),
                         ),
                       ),
@@ -255,25 +255,50 @@ class _CustomerListScreenState extends ConsumerState<CustomerListScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(displayName, style: AppTypography.h3.copyWith(fontSize: 14)),
-                          const SizedBox(height: 2),
-                          Text(subtitle, style: AppTypography.bodySmall.copyWith(fontSize: 11)),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF111827),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: (c.customerType == 'normal' ? Colors.grey : const Color(0xFF0D9488)).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  typeLabel,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: c.customerType == 'normal' ? Colors.grey : const Color(0xFF0D9488),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (addressParts.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              addressParts,
+                              style: TextStyle(
+                                    fontSize: 12,
+                                color: AppColors.textSecondary,
+                                height: 1.3,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: typeColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        typeLabel,
-                        style: TextStyle(
-                          color: typeColor,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
                       ),
                     ),
                   ],

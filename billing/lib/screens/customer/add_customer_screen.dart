@@ -299,9 +299,6 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
 
         if (_customerType == 'gst_individual') {
           _careOfCtrl.text = gstData['trade_name'] ?? '';
-        } else if (_customerType == 'gst_business') {
-          _businessNameCtrl.text = gstData['trade_name'] ?? '';
-          _keyPersonCtrl.text = gstData['legal_name'] ?? '';
         }
 
         _addressCtrl.text = gstData['address'] ?? '';
@@ -373,6 +370,12 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
                     const SizedBox(height: 24),
                     _buildSectionHeader('Contact Information', 'Mobile number is required'),
                     const SizedBox(height: 24),
+
+                    if (_customerType == 'normal' || _customerType == 'gst_individual') ...[
+                      _buildField('Customer Name *', _nameCtrl, Icons.person_outline_rounded, 'Required', textCapitalization: TextCapitalization.words),
+                      const SizedBox(height: 16),
+                    ],
+
                     TextFormField(
                       controller: _mobileCtrl,
                       keyboardType: TextInputType.phone,
@@ -398,18 +401,6 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
                     ),
                     const SizedBox(height: 16),
                     _buildField('Email (optional)', _emailCtrl, Icons.mail_outline_rounded, null, keyboardType: TextInputType.emailAddress),
-
-                    if (_customerType == 'normal' || _customerType == 'gst_individual') ...[
-                      const SizedBox(height: 16),
-                      _buildField('Customer Name *', _nameCtrl, Icons.person_outline_rounded, 'Required', textCapitalization: TextCapitalization.words),
-                    ],
-
-                    if (_customerType == 'gst_business') ...[
-                      const SizedBox(height: 16),
-                      _buildField('Business Name *', _businessNameCtrl, Icons.business_outlined, 'Required', textCapitalization: TextCapitalization.words),
-                      const SizedBox(height: 16),
-                      _buildField('Key Person *', _keyPersonCtrl, Icons.person_outline_rounded, 'Required', textCapitalization: TextCapitalization.words),
-                    ],
 
                     if (_customerType != 'normal') ...[
                       const SizedBox(height: 32),
@@ -446,15 +437,15 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
                     const SizedBox(height: 24),
                     _buildSectionHeader('Address', 'Pincode auto-fetches city/district/state'),
                     const SizedBox(height: 24),
-                    _buildField('Street Address', _addressCtrl, Icons.location_on_outlined, null, maxLines: 2, textCapitalization: TextCapitalization.words),
+                    _buildField('Street Address *', _addressCtrl, Icons.location_on_outlined, 'Required', maxLines: 2, textCapitalization: TextCapitalization.words),
                     const SizedBox(height: 16),
                     _buildPincodeField(),
                     const SizedBox(height: 16),
-                    _buildField('City', _cityCtrl, Icons.apartment_outlined, null, textCapitalization: TextCapitalization.words),
+                    _buildField('City *', _cityCtrl, Icons.apartment_outlined, 'Required', textCapitalization: TextCapitalization.words),
                     const SizedBox(height: 16),
-                    _buildField('District', _districtCtrl, Icons.map_outlined, null, textCapitalization: TextCapitalization.words),
+                    _buildField('District *', _districtCtrl, Icons.map_outlined, 'Required', textCapitalization: TextCapitalization.words),
                     const SizedBox(height: 16),
-                    _buildStateField('State'),
+                    _buildStateField('State *', isRequired: true),
                     if (_stateCode.isNotEmpty) ...[
                       const SizedBox(height: 6),
                       Padding(
@@ -504,11 +495,9 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
   Widget _buildCustomerTypeChips() {
     return Row(
       children: [
-        _typeChip('normal', 'Normal', Icons.person_outlined),
+        _typeChip('normal', 'Non GST', Icons.person_outlined),
         const SizedBox(width: 8),
-        _typeChip('gst_individual', 'GST Individual', Icons.receipt_outlined),
-        const SizedBox(width: 8),
-        _typeChip('gst_business', 'GST Business', Icons.business_outlined),
+        _typeChip('gst_individual', 'GST', Icons.receipt_outlined),
       ],
     );
   }
@@ -601,7 +590,7 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
     );
   }
 
-  Widget _buildStateField(String label) {
+  Widget _buildStateField(String label, {bool isRequired = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -611,6 +600,7 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
           focusNode: _stateFocusNode,
           textCapitalization: TextCapitalization.words,
           style: AppTypography.input,
+          validator: isRequired ? (v) => v!.isEmpty ? 'Required' : null : null,
           decoration: InputDecoration(
             labelText: label,
             labelStyle: AppTypography.bodySmall,

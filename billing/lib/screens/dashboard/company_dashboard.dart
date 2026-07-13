@@ -118,11 +118,12 @@ class _CompanyDashboardState extends ConsumerState<CompanyDashboard> with Single
                     color: Colors.blue,
                     onTap: () => Navigator.pushNamed(context, '/inventory-dashboard'),
                   ),
-                  const ModuleCard(
+                  ModuleCard(
                     title: 'Billing',
                     subtitle: 'Invoices & Tax',
                     icon: Icons.receipt_long_outlined,
                     color: Colors.orange,
+                    onTap: () => Navigator.pushNamed(context, '/billing-list'),
                   ),
                   const ModuleCard(
                     title: 'Reports',

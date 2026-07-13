@@ -17,6 +17,7 @@ import 'screens/settings/settings_screen.dart';
 import 'screens/company/company_screen.dart';
 import 'screens/customer/customer_list_screen.dart';
 import 'screens/customer/add_customer_screen.dart';
+import 'screens/invoice/invoice_list_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() async {
@@ -125,6 +126,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         '/company-profile': (context) => const CompanyScreen(),
         '/customer-list': (context) => const CustomerListScreen(),
         '/add-customer': (context) => const AddCustomerScreen(),
+        '/billing-list': (context) => const InvoiceListScreen(),
       },
     );
   }
