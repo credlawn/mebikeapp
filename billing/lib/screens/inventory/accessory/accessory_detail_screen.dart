@@ -33,8 +33,8 @@ class _AccessoryDetailScreenState extends ConsumerState<AccessoryDetailScreen> {
       setState(() => _item = Accessory(
         id: _item.id, collectionId: _item.collectionId,
         itemCode: _item.itemCode, name: _item.name, fullName: _item.fullName, status: newStatus,
-        variant: _item.variant, sellingPrice: _item.sellingPrice,
-        weight: _item.weight, gstSlab: _item.gstSlab, hsnCode: _item.hsnCode,
+        variant: _item.variant,         sellingPrice: _item.sellingPrice,
+        gstSlab: _item.gstSlab, hsnCode: _item.hsnCode,
         created: _item.created, updated: _item.updated,
       ));
       if (mounted) AppSnackBars.showSuccess(context, newStatus == 'active' ? 'Activated' : 'Deactivated');
@@ -64,7 +64,6 @@ class _AccessoryDetailScreenState extends ConsumerState<AccessoryDetailScreen> {
             const SizedBox(height: 12),
             _buildSection('Pricing & Compliance', [
               if (_item.sellingPrice > 0) _buildRow('Selling Price', '₹${_item.sellingPrice.toStringAsFixed(0)}'),
-              if (_item.weight > 0) _buildRow('Weight', '${_item.weight % 1 == 0 ? _item.weight.toInt() : _item.weight} kg'),
               _buildRow('GST Slab', '${_item.gstSlab}%'),
               if (_item.hsnCode.isNotEmpty) _buildRow('HSN Code', _item.hsnCode),
             ]),

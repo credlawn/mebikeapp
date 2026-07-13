@@ -6,7 +6,6 @@ class Accessory {
   final String fullName;
   final String variant;
   final double sellingPrice;
-  final double weight;
   final int gstSlab;
   final String hsnCode;
   final String status;
@@ -21,7 +20,6 @@ class Accessory {
     required this.fullName,
     this.variant = '',
     this.sellingPrice = 0,
-    this.weight = 0,
     this.gstSlab = 0,
     this.hsnCode = '',
     this.status = 'active',
@@ -38,7 +36,6 @@ class Accessory {
       fullName: (json['full_name'] ?? '').toString(),
       variant: (json['variant'] ?? '').toString(),
       sellingPrice: (json['selling_price'] is String ? double.tryParse(json['selling_price']) ?? 0 : (json['selling_price'] ?? 0)).toDouble(),
-      weight: (json['weight'] is String ? double.tryParse(json['weight']) ?? 0 : (json['weight'] ?? 0)).toDouble(),
       gstSlab: (json['gst_slab'] ?? 0).toInt(),
       hsnCode: (json['hsn_code'] ?? '').toString(),
       status: (json['status'] ?? 'active').toString(),
@@ -54,7 +51,6 @@ class Accessory {
       'full_name': fullName,
       'variant': variant.isEmpty ? null : variant,
       'selling_price': sellingPrice,
-      'weight': weight,
       'gst_slab': gstSlab,
       'hsn_code': hsnCode.isEmpty ? null : hsnCode,
       'status': status,

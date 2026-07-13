@@ -6,6 +6,12 @@ import '../../../theme/colors.dart';
 import '../../../theme/typography.dart';
 import '../../../theme/app_snackbars.dart';
 
+class _VariantEntry {
+  final String variant;
+  final double sellingPrice;
+  _VariantEntry(this.variant, this.sellingPrice);
+}
+
 class AddAccessoryScreen extends ConsumerStatefulWidget {
   final Accessory? editItem;
   const AddAccessoryScreen({super.key, this.editItem});
@@ -19,10 +25,10 @@ class _AddAccessoryScreenState extends ConsumerState<AddAccessoryScreen> {
   final _nameCtrl = TextEditingController();
   final _variantCtrl = TextEditingController();
   final _sellingPriceCtrl = TextEditingController();
-  final _weightCtrl = TextEditingController();
   final _hsnCtrl = TextEditingController();
   int _gstSlab = -1;
   bool _isLoading = false;
+  final _pendingVariants = <_VariantEntry>[];
 
   static const _gstOptions = [0, 5, 12, 18, 28];
 
@@ -34,7 +40,6 @@ class _AddAccessoryScreenState extends ConsumerState<AddAccessoryScreen> {
       _nameCtrl.text = e.name;
       _variantCtrl.text = e.variant;
       _sellingPriceCtrl.text = e.sellingPrice > 0 ? e.sellingPrice.toStringAsFixed(0) : '';
-      _weightCtrl.text = e.weight > 0 ? e.weight.toStringAsFixed(1) : '';
       _hsnCtrl.text = e.hsnCode;
       _gstSlab = e.gstSlab;
     }
@@ -47,15 +52,27 @@ class _AddAccessoryScreenState extends ConsumerState<AddAccessoryScreen> {
     _nameCtrl.dispose();
     _variantCtrl.dispose();
     _sellingPriceCtrl.dispose();
-    _weightCtrl.dispose();
     _hsnCtrl.dispose();
     super.dispose();
   }
 
-  String _generateFullName() {
+  String _generateFullName(String variant) {
     final n = _nameCtrl.text.trim();
-    final v = _variantCtrl.text.trim();
-    return v.isNotEmpty ? 'ME $n - $v' : 'ME $n';
+    return variant.isNotEmpty ? 'ME $n - $variant' : 'ME $n';
+  }
+
+  void _addVariant({bool keepPrice = false}) {
+    final v = _variantCtrl.text.trim().toUpperCase();
+    if (v.isEmpty) {
+      AppSnackBars.showError(context, 'Enter a variant name first');
+      return;
+    }
+    final price = double.tryParse(_sellingPriceCtrl.text.trim()) ?? 0;
+    setState(() {
+      _pendingVariants.add(_VariantEntry(v, price));
+      _variantCtrl.clear();
+      if (!keepPrice) _sellingPriceCtrl.clear();
+    });
   }
 
   Future<void> _save() async {
@@ -67,43 +84,65 @@ class _AddAccessoryScreenState extends ConsumerState<AddAccessoryScreen> {
     setState(() => _isLoading = true);
     try {
       final repo = ref.read(inventoryRepositoryProvider);
-      final body = {
-        'item_code': widget.editItem?.itemCode ?? '',
-        'full_name': _generateFullName(),
-        'name': _nameCtrl.text.trim(),
-        'variant': _variantCtrl.text.trim().isEmpty ? null : _variantCtrl.text.trim(),
-        'selling_price': double.tryParse(_sellingPriceCtrl.text.trim()) ?? 0,
-        'weight': double.tryParse(_weightCtrl.text.trim()) ?? 0,
-        'gst_slab': _gstSlab,
-        'hsn_code': _hsnCtrl.text.trim().isEmpty ? null : _hsnCtrl.text.trim(),
-        'status': widget.editItem?.status ?? 'active',
-      };
-      if (widget.editItem != null) {
-        await repo.updateAccessory(widget.editItem!.id, body);
+      final entries = <_VariantEntry>[];
+      if (_pendingVariants.isNotEmpty) {
+        entries.addAll(_pendingVariants);
+        final curVariant = _variantCtrl.text.trim().toUpperCase();
+        if (curVariant.isNotEmpty) {
+          entries.add(_VariantEntry(curVariant, double.tryParse(_sellingPriceCtrl.text.trim()) ?? 0));
+        }
       } else {
-        body['item_code'] = await _getNextCode();
-        await repo.createAccessory(body);
+        entries.add(_VariantEntry(_variantCtrl.text.trim().toUpperCase(), double.tryParse(_sellingPriceCtrl.text.trim()) ?? 0));
+      }
+
+      for (final entry in entries) {
+        if (entry.variant.isEmpty) {
+          if (mounted) AppSnackBars.showError(context, 'Variant is required');
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
+
+      final existing = await repo.getAllAccessories();
+      final baseNum = existing.isEmpty ? 0 : (int.tryParse(existing.first.itemCode.substring(3)) ?? 0);
+      var codeOffset = 0;
+      var created = 0;
+      var skipped = 0;
+      for (final entry in entries) {
+        final fullName = _generateFullName(entry.variant);
+        final isDuplicate = existing.any((a) =>
+          a.id != widget.editItem?.id &&
+          a.fullName.trim().toLowerCase() == fullName.toLowerCase()
+        );
+        if (isDuplicate) { skipped++; continue; }
+        final body = {
+          'item_code': widget.editItem?.itemCode ?? 'ACC${(baseNum + 1 + codeOffset).toString().padLeft(4, '0')}',
+          'full_name': fullName,
+          'name': _nameCtrl.text.trim(),
+          'variant': entry.variant.isEmpty ? null : entry.variant,
+          'selling_price': entry.sellingPrice,
+          'gst_slab': _gstSlab,
+          'hsn_code': _hsnCtrl.text.trim().isEmpty ? null : _hsnCtrl.text.trim(),
+          'status': widget.editItem?.status ?? 'active',
+        };
+        if (widget.editItem != null) {
+          await repo.updateAccessory(widget.editItem!.id, body);
+        } else {
+          await repo.createAccessory(body);
+        }
+        created++;
+        codeOffset++;
       }
       WidgetsBinding.instance.addPostFrameCallback((_) => ref.invalidate(allAccessoriesProvider));
-      if (mounted) AppSnackBars.showSuccess(context, widget.editItem != null ? 'Accessory updated' : 'Accessory added');
+      final parts = <String>[];
+      if (created > 0) parts.add('$created added');
+      if (skipped > 0) parts.add('$skipped skipped (duplicate)');
+      if (mounted) AppSnackBars.showSuccess(context, parts.join(', '));
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
       if (mounted) AppSnackBars.showError(context, 'Cannot reach server');
     } finally {
       if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<String> _getNextCode() async {
-    try {
-      final records = await ref.read(inventoryRepositoryProvider).getAllAccessories();
-      if (records.isEmpty) return 'ACC0001';
-      final lastCode = records.first.itemCode;
-      if (!lastCode.startsWith('ACC')) return 'ACC0001';
-      final num = int.tryParse(lastCode.substring(3)) ?? 0;
-      return 'ACC${(num + 1).toString().padLeft(4, '0')}';
-    } catch (_) {
-      return 'ACC0001';
     }
   }
 
@@ -120,10 +159,7 @@ class _AddAccessoryScreenState extends ConsumerState<AddAccessoryScreen> {
               onTap: _isLoading ? null : _save,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(20),
-                ),
+                decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
                 child: _isLoading
                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : Text('Save', style: AppTypography.bodyMedium.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -144,8 +180,7 @@ class _AddAccessoryScreenState extends ConsumerState<AddAccessoryScreen> {
               Text('GST Slab *', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
               const SizedBox(height: 8),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: 8, runSpacing: 8,
                 children: _gstOptions.map((slab) {
                   final selected = _gstSlab == slab;
                   return GestureDetector(
@@ -155,18 +190,11 @@ class _AddAccessoryScreenState extends ConsumerState<AddAccessoryScreen> {
                       decoration: BoxDecoration(
                         color: selected ? AppColors.primary : AppColors.background,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: selected ? AppColors.primary : AppColors.border,
-                          width: selected ? 1.5 : 1,
-                        ),
+                        border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.5 : 1),
                       ),
-                      child: Text(
-                        '$slab%',
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: selected ? Colors.white : AppColors.textSecondary,
-                          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
+                      child: Text('$slab%', style: AppTypography.bodyMedium.copyWith(
+                        color: selected ? Colors.white : AppColors.textSecondary,
+                        fontWeight: selected ? FontWeight.bold : FontWeight.normal)),
                     ),
                   );
                 }).toList(),
@@ -176,7 +204,7 @@ class _AddAccessoryScreenState extends ConsumerState<AddAccessoryScreen> {
               const SizedBox(height: 20),
               _buildField('Name *', _nameCtrl, Icons.backpack_rounded, 'Required', textCapitalization: TextCapitalization.characters),
               const SizedBox(height: 20),
-              _buildField('Variant (Leave blank if no variant)', _variantCtrl, Icons.tune_outlined, null, textCapitalization: TextCapitalization.characters),
+              _buildField('Variant', _variantCtrl, Icons.tune_outlined, null, textCapitalization: TextCapitalization.characters),
               if (_nameCtrl.text.trim().isNotEmpty || _variantCtrl.text.trim().isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 8, left: 4),
@@ -184,17 +212,87 @@ class _AddAccessoryScreenState extends ConsumerState<AddAccessoryScreen> {
                     children: [
                       const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.primary),
                       const SizedBox(width: 6),
-                      Flexible(
-                        child: Text('Name: ${_generateFullName()}',
-                          style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
-                      ),
+                      Flexible(child: Text('Name: ${_generateFullName(_variantCtrl.text.trim().toUpperCase())}',
+                        style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600))),
                     ],
                   ),
                 ),
               const SizedBox(height: 20),
-              _buildField('Selling Price (₹) *', _sellingPriceCtrl, Icons.currency_rupee_rounded, 'Required', keyboardType: TextInputType.number),
-              const SizedBox(height: 20),
-              _buildField('Weight (kg) *', _weightCtrl, Icons.monitor_weight_outlined, 'Required', keyboardType: TextInputType.number),
+              _buildField('Selling Price (₹)', _sellingPriceCtrl, Icons.currency_rupee_rounded, null, keyboardType: TextInputType.number),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'new') {
+                        _addVariant();
+                      } else {
+                        _addVariant(keepPrice: true);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight, borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.primary),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.add_rounded, size: 16, color: AppColors.primary),
+                          const SizedBox(width: 6),
+                          Text('Add Variant', style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                          const Icon(Icons.expand_more_rounded, size: 16, color: AppColors.primary),
+                        ],
+                      ),
+                    ),
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'new', child: Text('New Variant')),
+                      const PopupMenuItem(value: 'same_price', child: Text('Same Price')),
+                    ],
+                  ),
+                  if (_pendingVariants.isNotEmpty) ...[
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
+                      child: Text('${_pendingVariants.length} pending',
+                        style: AppTypography.bodySmall.copyWith(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ],
+              ),
+              if (_pendingVariants.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(10)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Pending Variants', style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted)),
+                      const SizedBox(height: 8),
+                      ..._pendingVariants.asMap().entries.map((entry) {
+                        final i = entry.key;
+                        final v = entry.value;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            children: [
+                              Expanded(child: Text('${v.variant}  |  ₹${v.sellingPrice.toStringAsFixed(0)}',
+                                style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600))),
+                              GestureDetector(
+                                onTap: () => setState(() => _pendingVariants.removeAt(i)),
+                                child: const Icon(Icons.close_rounded, size: 16, color: AppColors.error),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -204,13 +302,10 @@ class _AddAccessoryScreenState extends ConsumerState<AddAccessoryScreen> {
 
   Widget _buildField(String label, TextEditingController ctrl, IconData icon, String? error, {TextInputType? keyboardType, TextCapitalization textCapitalization = TextCapitalization.none}) {
     return TextFormField(
-      controller: ctrl,
-      keyboardType: keyboardType,
-      textCapitalization: textCapitalization,
+      controller: ctrl, keyboardType: keyboardType, textCapitalization: textCapitalization,
       style: AppTypography.input,
       decoration: InputDecoration(
-        labelText: label,
-        labelStyle: AppTypography.bodySmall,
+        labelText: label, labelStyle: AppTypography.bodySmall,
         prefixIcon: Icon(icon, size: 18, color: AppColors.textSecondary),
         filled: true, fillColor: AppColors.background,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),

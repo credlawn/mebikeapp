@@ -3,11 +3,12 @@ class Battery {
   final String collectionId;
   final String itemCode;
   final String name;
+  final String fullName;
   final String volt;
   final String amp;
-  final String chemistry;
-  final String color;
-  final double mrp;
+  final String cellType;
+  final String variant;
+  final double sellingPrice;
   final double weight;
   final int gstSlab;
   final String hsnCode;
@@ -20,11 +21,12 @@ class Battery {
     required this.collectionId,
     required this.itemCode,
     required this.name,
+    required this.fullName,
     this.volt = '',
     this.amp = '',
-    this.chemistry = '',
-    this.color = '',
-    this.mrp = 0,
+    this.cellType = '',
+    this.variant = '',
+    this.sellingPrice = 0,
     this.weight = 0,
     this.gstSlab = 0,
     this.hsnCode = '',
@@ -39,11 +41,12 @@ class Battery {
       collectionId: json['collectionId'] ?? '',
       itemCode: (json['item_code'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
+      fullName: (json['full_name'] ?? '').toString(),
       volt: (json['volt'] ?? '').toString(),
       amp: (json['amp'] ?? '').toString(),
-      chemistry: (json['chemistry'] ?? '').toString(),
-      color: (json['color'] ?? '').toString(),
-      mrp: (json['mrp'] is String ? double.tryParse(json['mrp']) ?? 0 : (json['mrp'] ?? 0)).toDouble(),
+      cellType: (json['cell_type'] ?? '').toString(),
+      variant: (json['variant'] ?? '').toString(),
+      sellingPrice: (json['selling_price'] is String ? double.tryParse(json['selling_price']) ?? 0 : (json['selling_price'] ?? 0)).toDouble(),
       weight: (json['weight'] is String ? double.tryParse(json['weight']) ?? 0 : (json['weight'] ?? 0)).toDouble(),
       gstSlab: (json['gst_slab'] ?? 0).toInt(),
       hsnCode: (json['hsn_code'] ?? '').toString(),
@@ -57,11 +60,12 @@ class Battery {
     return {
       'item_code': itemCode,
       'name': name,
+      'full_name': fullName,
       'volt': volt.isEmpty ? null : volt,
       'amp': amp.isEmpty ? null : amp,
-      'chemistry': chemistry.isEmpty ? null : chemistry,
-      'color': color.isEmpty ? null : color,
-      'mrp': mrp,
+      'cell_type': cellType.isEmpty ? null : cellType,
+      'variant': variant.isEmpty ? null : variant,
+      'selling_price': sellingPrice,
       'weight': weight,
       'gst_slab': gstSlab,
       'hsn_code': hsnCode.isEmpty ? null : hsnCode,

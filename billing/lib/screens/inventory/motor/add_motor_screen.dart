@@ -19,7 +19,6 @@ class _AddMotorScreenState extends ConsumerState<AddMotorScreen> {
   final _powerWattCtrl = TextEditingController();
   final _variantCtrl = TextEditingController();
   final _sellingPriceCtrl = TextEditingController();
-  final _weightCtrl = TextEditingController();
   final _hsnCtrl = TextEditingController();
   int _gstSlab = -1;
   bool _isLoading = false;
@@ -34,7 +33,6 @@ class _AddMotorScreenState extends ConsumerState<AddMotorScreen> {
       _powerWattCtrl.text = e.powerWatt;
       _variantCtrl.text = e.variant;
       _sellingPriceCtrl.text = e.sellingPrice > 0 ? e.sellingPrice.toStringAsFixed(0) : '';
-      _weightCtrl.text = e.weight > 0 ? e.weight.toStringAsFixed(1) : '';
       _hsnCtrl.text = e.hsnCode;
       _gstSlab = e.gstSlab;
     } else {
@@ -53,7 +51,6 @@ class _AddMotorScreenState extends ConsumerState<AddMotorScreen> {
     _powerWattCtrl.dispose();
     _variantCtrl.dispose();
     _sellingPriceCtrl.dispose();
-    _weightCtrl.dispose();
     _hsnCtrl.dispose();
     super.dispose();
   }
@@ -102,7 +99,6 @@ class _AddMotorScreenState extends ConsumerState<AddMotorScreen> {
         'variant': _variantCtrl.text.trim().isEmpty ? null : _variantCtrl.text.trim(),
         'power_watt': _powerWattCtrl.text.trim().isEmpty ? null : _powerWattCtrl.text.trim(),
         'selling_price': double.tryParse(_sellingPriceCtrl.text.trim()) ?? 0,
-        'weight': double.tryParse(_weightCtrl.text.trim()) ?? 0,
         'gst_slab': _gstSlab,
         'hsn_code': _hsnCtrl.text.trim().isEmpty ? null : _hsnCtrl.text.trim(),
         'status': widget.editItem?.status ?? 'active',
@@ -170,16 +166,6 @@ class _AddMotorScreenState extends ConsumerState<AddMotorScreen> {
             children: [
               Text('Motor Details', style: AppTypography.h2),
               const SizedBox(height: 24),
-              _buildField('HSN Code *', _hsnCtrl, Icons.receipt_long_outlined, 'Required', keyboardType: TextInputType.number),
-              const SizedBox(height: 20),
-              _buildField('Weight (kg) *', _weightCtrl, Icons.monitor_weight_outlined, 'Required', keyboardType: TextInputType.number),
-              const SizedBox(height: 20),
-              _buildField('Power in Watt *', _powerWattCtrl, Icons.speed_rounded, 'Required', keyboardType: TextInputType.number),
-              const SizedBox(height: 20),
-              _buildField('Selling Price (₹) *', _sellingPriceCtrl, Icons.currency_rupee_rounded, 'Required', keyboardType: TextInputType.number),
-              const SizedBox(height: 20),
-              _buildField('Variant (Leave blank if no variant)', _variantCtrl, Icons.tune_outlined, null, textCapitalization: TextCapitalization.characters),
-              const SizedBox(height: 24),
               Text('GST Slab *', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
               const SizedBox(height: 8),
               Wrap(
@@ -210,29 +196,28 @@ class _AddMotorScreenState extends ConsumerState<AddMotorScreen> {
                   );
                 }).toList(),
               ),
+              const SizedBox(height: 24),
+              _buildField('HSN Code *', _hsnCtrl, Icons.receipt_long_outlined, 'Required', keyboardType: TextInputType.number),
+              const SizedBox(height: 20),
+              _buildField('Variant (Leave blank if no variant)', _variantCtrl, Icons.tune_outlined, null, textCapitalization: TextCapitalization.characters),
               if (_powerWattCtrl.text.trim().isNotEmpty || _variantCtrl.text.trim().isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.only(top: 24),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            'Name: ${_generateFullName()}',
-                            style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
+                  padding: const EdgeInsets.only(top: 8, left: 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text('Name: ${_generateFullName()}',
+                          style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
                   ),
                 ),
+              const SizedBox(height: 20),
+              _buildField('Power in Watt *', _powerWattCtrl, Icons.speed_rounded, 'Required', keyboardType: TextInputType.number),
+              const SizedBox(height: 20),
+              _buildField('Selling Price (₹) *', _sellingPriceCtrl, Icons.currency_rupee_rounded, 'Required', keyboardType: TextInputType.number),
             ],
           ),
         ),

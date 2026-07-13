@@ -32,10 +32,9 @@ class _BatteryDetailScreenState extends ConsumerState<BatteryDetailScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => ref.invalidate(allBatteriesProvider));
       setState(() => _item = Battery(
         id: _item.id, collectionId: _item.collectionId,
-        itemCode: _item.itemCode, name: _item.name, status: newStatus,
-        volt: _item.volt, amp: _item.amp,
-        chemistry: _item.chemistry, color: _item.color,
-        mrp: _item.mrp, weight: _item.weight,
+        itemCode: _item.itemCode, name: _item.name, fullName: _item.fullName, status: newStatus,
+        volt: _item.volt, amp: _item.amp, cellType: _item.cellType, variant: _item.variant,
+        sellingPrice: _item.sellingPrice, weight: _item.weight,
         gstSlab: _item.gstSlab, hsnCode: _item.hsnCode,
         created: _item.created, updated: _item.updated,
       ));
@@ -52,30 +51,29 @@ class _BatteryDetailScreenState extends ConsumerState<BatteryDetailScreen> {
     final isActive = _item.status == 'active';
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(_item.name)),
+      appBar: AppBar(title: Text(_item.fullName)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             _buildSection('Battery Info', [
               _buildRow('Item Code', _item.itemCode),
+              _buildRow('Full Name', _item.fullName),
               _buildRow('Name', _item.name),
               if (_item.volt.isNotEmpty) _buildRow('Volt', _item.volt),
               if (_item.amp.isNotEmpty) _buildRow('Amp', _item.amp),
-              if (_item.chemistry.isNotEmpty) _buildRow('Chemistry', _toTitleCase(_item.chemistry)),
-              if (_item.color.isNotEmpty) _buildRow('Color', _item.color),
+              if (_item.cellType.isNotEmpty) _buildRow('Cell Type', _item.cellType),
+              if (_item.variant.isNotEmpty) _buildRow('Variant', _item.variant),
             ]),
             const SizedBox(height: 12),
             _buildSection('Pricing & Compliance', [
-              if (_item.mrp > 0) _buildRow('MRP', '₹${_item.mrp.toStringAsFixed(0)}'),
+              if (_item.sellingPrice > 0) _buildRow('Selling Price', '₹${_item.sellingPrice.toStringAsFixed(0)}'),
               if (_item.weight > 0) _buildRow('Weight', '${_item.weight % 1 == 0 ? _item.weight.toInt() : _item.weight} kg'),
               _buildRow('GST Slab', '${_item.gstSlab}%'),
               if (_item.hsnCode.isNotEmpty) _buildRow('HSN Code', _item.hsnCode),
             ]),
             const SizedBox(height: 12),
-            _buildSection('Status', [
-              _buildStatusRow(_item.status),
-            ]),
+            _buildSection('Status', [_buildStatusRow(_item.status)]),
           ],
         ),
       ),
@@ -113,8 +111,7 @@ class _BatteryDetailScreenState extends ConsumerState<BatteryDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title, style: AppTypography.h3.copyWith(color: AppColors.primary, fontSize: 13)),
-          const SizedBox(height: 12),
-          ...rows,
+          const SizedBox(height: 12), ...rows,
         ],
       ),
     );
@@ -153,10 +150,5 @@ class _BatteryDetailScreenState extends ConsumerState<BatteryDetailScreen> {
         ],
       ),
     );
-  }
-
-  String _toTitleCase(String text) {
-    if (text.isEmpty) return text;
-    return text[0].toUpperCase() + text.substring(1).toLowerCase();
   }
 }
