@@ -18,6 +18,7 @@ class InvoiceItem {
   double sgstAmount;
   double igstAmount;
   double total;
+  bool isGstInclusive;
 
   InvoiceItem({
     required this.itemType,
@@ -37,6 +38,7 @@ class InvoiceItem {
     this.sgstAmount = 0,
     this.igstAmount = 0,
     this.total = 0,
+    this.isGstInclusive = false,
   });
 
   factory InvoiceItem.fromJson(Map<String, dynamic> json) {
@@ -58,6 +60,7 @@ class InvoiceItem {
       sgstAmount: (json['sgst_amount'] ?? 0).toDouble(),
       igstAmount: (json['igst_amount'] ?? 0).toDouble(),
       total: (json['total'] ?? 0).toDouble(),
+      isGstInclusive: json['is_gst_inclusive'] ?? false,
     );
   }
 
@@ -79,6 +82,7 @@ class InvoiceItem {
     'sgst_amount': sgstAmount,
     'igst_amount': igstAmount,
     'total': total,
+    'is_gst_inclusive': isGstInclusive,
   };
 }
 

@@ -11,6 +11,8 @@ import '../../theme/app_snackbars.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import 'item_select_screen.dart';
+import 'vehicle_qty_color_screen.dart';
+import 'battery_combo_screen.dart';
 
 class BillingScreen extends ConsumerStatefulWidget {
   final String invoiceType;
@@ -97,7 +99,15 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
     final qty = item.quantity;
     final basePrice = item.unitPrice * qty;
     final discAmt = basePrice * item.discountPercent / 100;
-    item.taxableValue = basePrice - discAmt;
+    final netAmount = basePrice - discAmt;
+
+    final double taxable;
+    if (item.isGstInclusive) {
+      taxable = netAmount / (1 + gstSlab / 100);
+    } else {
+      taxable = netAmount;
+    }
+    item.taxableValue = taxable;
 
     if (_isInterState) {
       item.cgstRate = 0;
@@ -105,17 +115,17 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       item.igstRate = gstSlab.toDouble();
       item.cgstAmount = 0;
       item.sgstAmount = 0;
-      item.igstAmount = item.taxableValue * gstSlab / 100;
-      item.total = item.taxableValue + item.igstAmount;
+      item.igstAmount = taxable * gstSlab / 100;
+      item.total = taxable + item.igstAmount;
     } else {
       final gstHalf = gstSlab / 2;
       item.cgstRate = gstHalf;
       item.sgstRate = gstHalf;
       item.igstRate = 0;
-      item.cgstAmount = item.taxableValue * gstHalf / 100;
-      item.sgstAmount = item.taxableValue * gstHalf / 100;
+      item.cgstAmount = taxable * gstHalf / 100;
+      item.sgstAmount = taxable * gstHalf / 100;
       item.igstAmount = 0;
-      item.total = item.taxableValue + item.cgstAmount + item.sgstAmount;
+      item.total = taxable + item.cgstAmount + item.sgstAmount;
     }
     setState(() {});
   }
@@ -194,6 +204,12 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       );
 
       if (rec == null || !mounted) return;
+
+      if (type == 'vehicle') {
+        await _handleVehicleFlow(rec);
+        return;
+      }
+
       final hsn = rec.getStringValue('hsn_code');
       final gstSlab = rec.getDoubleValue('gst_slab').toInt();
       final price = rec.getDoubleValue('selling_price');
@@ -264,6 +280,122 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       }
     } catch (_) {
       if (mounted) AppSnackBars.showError(context, 'Cannot fetch items');
+    }
+  }
+
+  Future<void> _handleVehicleFlow(dynamic rec) async {
+    final vehicleData = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => VehicleQtyColorScreen(vehicleRecord: rec),
+      ),
+    );
+    if (vehicleData == null || !mounted) return;
+
+    final vehicle = vehicleData['vehicle'] as dynamic;
+    final int totalQty = vehicleData['totalQty'] as int;
+    final colorEntries = vehicleData['colorEntries'] as List<Map<String, dynamic>>;
+
+    final batteryResult = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => BatteryComboScreen(
+          vehicleRecord: vehicle,
+          totalQty: totalQty,
+          colorEntries: colorEntries,
+        ),
+      ),
+    );
+    if (batteryResult == null || !mounted) return;
+
+    final batteryCombos = batteryResult['batteryCombos'] as List<Map<String, dynamic>>;
+
+    final int gstSlab = vehicle.getDoubleValue('gst_slab').toInt();
+    final String hsn = vehicle.getStringValue('hsn_code');
+    final String code = vehicle.getStringValue('item_code');
+    final String fn = vehicle.getStringValue('full_name');
+    final String nm = vehicle.getStringValue('name');
+    final String fullName = fn.isNotEmpty ? fn : nm;
+
+    // Greedy: always match highest qty color with highest qty battery
+    var cRemaining = colorEntries.map((c) => Map<String, dynamic>.from(c)).toList();
+    var bRemaining = batteryCombos.map((b) => Map<String, dynamic>.from(b)).toList();
+
+    // Pre-compute unit rates from original battery data
+    final unitRateOf = <String, double>{};
+    for (final b in batteryCombos) {
+      final rec = b['batteryRecord'] as dynamic;
+      final qty = b['qty'] as int;
+      final totalPrice = b['totalPrice'] as double;
+      unitRateOf[rec.id] = totalPrice / qty;
+    }
+
+    while (true) {
+      cRemaining.removeWhere((c) => (c['qty'] as int) <= 0);
+      bRemaining.removeWhere((b) => (b['qty'] as int) <= 0);
+      if (cRemaining.isEmpty || bRemaining.isEmpty) break;
+
+      cRemaining.sort((a, b) => (b['qty'] as int).compareTo(a['qty'] as int));
+      bRemaining.sort((a, b) => (b['qty'] as int).compareTo(a['qty'] as int));
+
+      final int maxC = cRemaining.first['qty'] as int;
+      final int maxB = bRemaining.first['qty'] as int;
+
+      if (maxC >= maxB) {
+        // Fill largest color with batteries (largest first)
+        final color = cRemaining.first;
+        final colorName = color['color'] as String;
+        int need = maxC;
+        for (final batt in bRemaining) {
+          if (need <= 0) break;
+          final int battQty = batt['qty'] as int;
+          if (battQty <= 0) continue;
+          final int take = need < battQty ? need : battQty;
+          final battRec = batt['batteryRecord'] as dynamic;
+          final String bFn = battRec.getStringValue('full_name');
+          final String bNm = battRec.getStringValue('name');
+          final String bName = bFn.isNotEmpty ? bFn : bNm;
+          _items.add(InvoiceItem(
+            itemType: 'vehicle', itemId: vehicle.id, itemCode: code,
+            itemName: '$fullName - $colorName + $bName',
+            hsnCode: hsn, gstSlab: gstSlab,
+            quantity: take.toDouble(), unitPrice: unitRateOf[battRec.id]!,
+            isGstInclusive: true,
+          ));
+          _recalculateItem(_items.length - 1);
+          batt['qty'] = battQty - take;
+          need -= take;
+        }
+        color['qty'] = need;
+      } else {
+        // Fill largest battery with colors (largest first)
+        final batt = bRemaining.first;
+        final battRec = batt['batteryRecord'] as dynamic;
+        final String bFn = battRec.getStringValue('full_name');
+        final String bNm = battRec.getStringValue('name');
+        final String bName = bFn.isNotEmpty ? bFn : bNm;
+        int need = maxB;
+        for (final color in cRemaining) {
+          if (need <= 0) break;
+          final int colorQty = color['qty'] as int;
+          if (colorQty <= 0) continue;
+          final int take = need < colorQty ? need : colorQty;
+          final colorName = color['color'] as String;
+          _items.add(InvoiceItem(
+            itemType: 'vehicle', itemId: vehicle.id, itemCode: code,
+            itemName: '$fullName - $colorName + $bName',
+            hsnCode: hsn, gstSlab: gstSlab,
+            quantity: take.toDouble(), unitPrice: unitRateOf[battRec.id]!,
+            isGstInclusive: true,
+          ));
+          _recalculateItem(_items.length - 1);
+          color['qty'] = colorQty - take;
+          need -= take;
+        }
+        batt['qty'] = need;
+      }
+    }
+
+    if (mounted) {
+      AppSnackBars.showSuccess(context, '${_items.length} items added');
     }
   }
 
