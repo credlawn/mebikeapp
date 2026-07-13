@@ -3,10 +3,11 @@ class Charger {
   final String collectionId;
   final String itemCode;
   final String name;
-  final String chargerType;
-  final String ampRating;
-  final double mrp;
-  final double weight;
+  final String fullName;
+  final String variant;
+  final String volt;
+  final String amp;
+  final double sellingPrice;
   final int gstSlab;
   final String hsnCode;
   final String status;
@@ -18,10 +19,11 @@ class Charger {
     required this.collectionId,
     required this.itemCode,
     required this.name,
-    this.chargerType = '',
-    this.ampRating = '',
-    this.mrp = 0,
-    this.weight = 0,
+    required this.fullName,
+    this.variant = '',
+    this.volt = '',
+    this.amp = '',
+    this.sellingPrice = 0,
     this.gstSlab = 0,
     this.hsnCode = '',
     this.status = 'active',
@@ -35,10 +37,11 @@ class Charger {
       collectionId: json['collectionId'] ?? '',
       itemCode: (json['item_code'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
-      chargerType: (json['charger_type'] ?? '').toString(),
-      ampRating: (json['amp_rating'] ?? '').toString(),
-      mrp: (json['mrp'] is String ? double.tryParse(json['mrp']) ?? 0 : (json['mrp'] ?? 0)).toDouble(),
-      weight: (json['weight'] is String ? double.tryParse(json['weight']) ?? 0 : (json['weight'] ?? 0)).toDouble(),
+      fullName: (json['full_name'] ?? '').toString(),
+      variant: (json['variant'] ?? '').toString(),
+      volt: (json['volt'] ?? '').toString(),
+      amp: (json['amp'] ?? '').toString(),
+      sellingPrice: (json['selling_price'] is String ? double.tryParse(json['selling_price']) ?? 0 : (json['selling_price'] ?? 0)).toDouble(),
       gstSlab: (json['gst_slab'] ?? 0).toInt(),
       hsnCode: (json['hsn_code'] ?? '').toString(),
       status: (json['status'] ?? 'active').toString(),
@@ -51,10 +54,11 @@ class Charger {
     return {
       'item_code': itemCode,
       'name': name,
-      'charger_type': chargerType.isEmpty ? null : chargerType,
-      'amp_rating': ampRating.isEmpty ? null : ampRating,
-      'mrp': mrp,
-      'weight': weight,
+      'full_name': fullName,
+      'variant': variant.isEmpty ? null : variant,
+      'volt': volt.isEmpty ? null : volt,
+      'amp': amp.isEmpty ? null : amp,
+      'selling_price': sellingPrice,
       'gst_slab': gstSlab,
       'hsn_code': hsnCode.isEmpty ? null : hsnCode,
       'status': status,

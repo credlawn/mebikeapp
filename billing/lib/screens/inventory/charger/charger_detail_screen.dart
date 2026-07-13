@@ -32,9 +32,9 @@ class _ChargerDetailScreenState extends ConsumerState<ChargerDetailScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => ref.invalidate(allChargersProvider));
       setState(() => _item = Charger(
         id: _item.id, collectionId: _item.collectionId,
-        itemCode: _item.itemCode, name: _item.name, status: newStatus,
-        chargerType: _item.chargerType, ampRating: _item.ampRating,
-        mrp: _item.mrp, weight: _item.weight,
+        itemCode: _item.itemCode, name: _item.name, fullName: _item.fullName, status: newStatus,
+        variant: _item.variant, volt: _item.volt, amp: _item.amp,
+        sellingPrice: _item.sellingPrice,
         gstSlab: _item.gstSlab, hsnCode: _item.hsnCode,
         created: _item.created, updated: _item.updated,
       ));
@@ -51,28 +51,27 @@ class _ChargerDetailScreenState extends ConsumerState<ChargerDetailScreen> {
     final isActive = _item.status == 'active';
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(_item.name)),
+      appBar: AppBar(title: Text(_item.fullName.isNotEmpty ? _item.fullName : _item.name)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             _buildSection('Charger Info', [
               _buildRow('Item Code', _item.itemCode),
+              _buildRow('Full Name', _item.fullName.isNotEmpty ? _item.fullName : _item.name),
               _buildRow('Name', _item.name),
-              if (_item.chargerType.isNotEmpty) _buildRow('Charger Type', _toTitleCase(_item.chargerType)),
-              if (_item.ampRating.isNotEmpty) _buildRow('Amp Rating', _item.ampRating),
+              if (_item.variant.isNotEmpty) _buildRow('Variant', _item.variant),
+              if (_item.volt.isNotEmpty) _buildRow('Volt', _item.volt),
+              if (_item.amp.isNotEmpty) _buildRow('Amp', _item.amp),
             ]),
             const SizedBox(height: 12),
             _buildSection('Pricing & Compliance', [
-              if (_item.mrp > 0) _buildRow('MRP', '₹${_item.mrp.toStringAsFixed(0)}'),
-              if (_item.weight > 0) _buildRow('Weight', '${_item.weight % 1 == 0 ? _item.weight.toInt() : _item.weight} kg'),
+              if (_item.sellingPrice > 0) _buildRow('Selling Price', '₹${_item.sellingPrice.toStringAsFixed(0)}'),
               _buildRow('GST Slab', '${_item.gstSlab}%'),
               if (_item.hsnCode.isNotEmpty) _buildRow('HSN Code', _item.hsnCode),
             ]),
             const SizedBox(height: 12),
-            _buildSection('Status', [
-              _buildStatusRow(_item.status),
-            ]),
+            _buildSection('Status', [_buildStatusRow(_item.status)]),
           ],
         ),
       ),
@@ -110,8 +109,7 @@ class _ChargerDetailScreenState extends ConsumerState<ChargerDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title, style: AppTypography.h3.copyWith(color: AppColors.primary, fontSize: 13)),
-          const SizedBox(height: 12),
-          ...rows,
+          const SizedBox(height: 12), ...rows,
         ],
       ),
     );
@@ -150,10 +148,5 @@ class _ChargerDetailScreenState extends ConsumerState<ChargerDetailScreen> {
         ],
       ),
     );
-  }
-
-  String _toTitleCase(String text) {
-    if (text.isEmpty) return text;
-    return text[0].toUpperCase() + text.substring(1).toLowerCase();
   }
 }
