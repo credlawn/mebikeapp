@@ -13,6 +13,7 @@ import '../../theme/typography.dart';
 import 'item_select_screen.dart';
 import 'vehicle_qty_color_screen.dart';
 import 'battery_combo_screen.dart';
+import '../invoice/invoice_detail_screen.dart';
 
 class BillingScreen extends ConsumerStatefulWidget {
   final String invoiceType;
@@ -32,7 +33,7 @@ class BillingScreen extends ConsumerStatefulWidget {
 class _BillingScreenState extends ConsumerState<BillingScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
-  String _invoiceNo = '';
+  final String _invoiceNo = '';
 
   late String _invoiceType;
   String _customerId = '';
@@ -68,13 +69,6 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       _partyStateCode = p.stateCode;
       _partyAddress = p.billingAddress;
     }
-    _loadInvoiceNo();
-  }
-
-  Future<void> _loadInvoiceNo() async {
-    final repo = ref.read(invoiceRepositoryProvider);
-    final no = await repo.getNextInvoiceNo();
-    if (mounted) setState(() => _invoiceNo = no);
   }
 
   double get _subtotal => _items.fold(0, (sum, item) => sum + item.taxableValue);
@@ -331,6 +325,82 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       if (confirmed == true && mounted) {
         final qty = double.tryParse(qtyCtrl.text) ?? 1;
         final perUnitPrice = double.tryParse(priceCtrl.text) ?? 0;
+
+        final existing = _items.where((i) => i.itemName == name).toList();
+        if (existing.any((i) => i.unitPrice == perUnitPrice)) {
+          if (mounted) AppSnackBars.showError(context, '"$name" at ₹$perUnitPrice already exists');
+          return;
+        }
+        if (existing.any((i) => i.unitPrice != perUnitPrice)) {
+          final oldItem = existing.first;
+          final oldPrice = oldItem.unitPrice;
+          final oldQty = oldItem.quantity.toInt();
+          if (!mounted) return;
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 80),
+              contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+              actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+              content: SizedBox(
+                width: MediaQuery.of(ctx).size.width - 88,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 48, height: 48,
+                      decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), shape: BoxShape.circle),
+                      child: const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 28),
+                    ),
+                    const SizedBox(height: 16),
+                    Text('Price Change', style: AppTypography.h2.copyWith(fontSize: 18)),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Already added Qty-$oldQty at ₹${oldPrice.toStringAsFixed(0)}',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary, height: 1.5),
+                    ),
+                    Text(
+                      'Add Qty-$qty at ₹${perUnitPrice.toStringAsFixed(0)}?',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary, height: 1.5),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary, width: 1.2),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Text('Cancel', style: AppTypography.button.copyWith(color: AppColors.primary)),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary, foregroundColor: Colors.white, elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Text('Add', style: AppTypography.button.copyWith(color: Colors.white)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+          if (confirm != true) return;
+        }
         _items.add(InvoiceItem(
           itemType: type,
           itemId: rec.id,
@@ -394,6 +464,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
           final oldPrice = oldItem.unitPrice;
           final oldQty = oldItem.quantity.toInt();
           final newQty = c['qty'] as int;
+          if (!mounted) return;
           final confirm = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
@@ -525,6 +596,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
             final oldItem = existing.first;
             final oldPrice = oldItem.unitPrice;
             final oldQty = oldItem.quantity.toInt();
+            if (!mounted) return;
             final confirm = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
@@ -625,6 +697,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
             final oldItem = existing.first;
             final oldPrice = oldItem.unitPrice;
             final oldQty = oldItem.quantity.toInt();
+            if (!mounted) return;
             final confirm = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
@@ -724,8 +797,14 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       final paidAmount = double.tryParse(_paidAmountCtrl.text) ?? _grandTotal;
       final balance = _grandTotal - paidAmount;
 
+      final repo = ref.read(invoiceRepositoryProvider);
+      String invoiceNo = '';
+      if (isFinal) {
+        invoiceNo = await repo.getNextInvoiceNo();
+      }
+
       final body = {
-        'invoice_no': _invoiceNo,
+        'invoice_no': invoiceNo,
         'invoice_type': _invoiceType,
         'invoice_date': DateTime.now().toIso8601String(),
         'partner_id': _invoiceType == 'partner' ? widget.partner?.id : null,
@@ -751,12 +830,19 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
         'notes': '',
       };
 
-      final repo = ref.read(invoiceRepositoryProvider);
-      await repo.createInvoice(body);
+      final inv = await repo.createInvoice(body);
       ref.invalidate(allInvoicesProvider);
-      if (mounted) {
-        AppSnackBars.showSuccess(context, 'Invoice Created: $_invoiceNo');
-        Navigator.of(context).pop();
+      if (!mounted) return;
+
+      if (isFinal) {
+        AppSnackBars.showSuccess(context, 'Invoice Created: $invoiceNo');
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => InvoiceDetailScreen(invoice: inv),
+          ),
+        );
+      } else {
+        AppSnackBars.showSuccess(context, 'Draft saved');
       }
     } catch (_) {
       if (mounted) AppSnackBars.showError(context, 'Save failed. Try again.');
@@ -802,7 +888,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
         elevation: 0,
         actions: [
           TextButton(
-            onPressed: _isSaving ? null : () => _saveInvoice(),
+            onPressed: _isSaving ? null : () => _saveInvoice(isFinal: false),
             child: _isSaving
                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
                 : Text('Save', style: AppTypography.button.copyWith(color: AppColors.primary)),
@@ -827,7 +913,10 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
                   children: [
                     const Icon(Icons.receipt_long_outlined, size: 18, color: AppColors.primary),
                     const SizedBox(width: 10),
-                    Text('Invoice No: $_invoiceNo', style: AppTypography.h3.copyWith(color: AppColors.primary)),
+                    Text(
+                      _invoiceNo.isNotEmpty ? 'Invoice No: $_invoiceNo' : 'New Invoice',
+                      style: AppTypography.h3.copyWith(color: AppColors.primary),
+                    ),
                   ],
                 ),
               ),

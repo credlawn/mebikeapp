@@ -369,6 +369,7 @@ class _AddPartnerScreenState extends ConsumerState<AddPartnerScreen> {
     final effectiveCode = _partnerCode.isNotEmpty ? _partnerCode : partnerCode;
     final effectiveStatus = _partnerCode.isNotEmpty ? _partnerStatus : status;
     return {
+      'name': _billingBusinessController.text.trim(),
       'partner_name': _billingBusinessController.text.trim(),
       'legal_name': _nameController.text.trim(),
       'partner_code': effectiveCode,

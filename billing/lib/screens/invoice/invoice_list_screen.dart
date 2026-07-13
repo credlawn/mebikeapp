@@ -215,18 +215,14 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
 
           Color statusColor;
           String statusLabel;
-          switch (inv.paymentStatus) {
-            case 'paid':
+          switch (inv.status) {
+            case 'confirmed':
               statusColor = AppColors.success;
-              statusLabel = 'Paid';
-              break;
-            case 'partial':
-              statusColor = Colors.orange;
-              statusLabel = 'Partial';
+              statusLabel = 'Confirmed';
               break;
             default:
-              statusColor = AppColors.error;
-              statusLabel = 'Unpaid';
+              statusColor = Colors.orange;
+              statusLabel = 'Draft';
           }
 
           final typeColor = inv.invoiceType == 'partner' ? AppColors.primary : const Color(0xFF0D9488);
@@ -245,7 +241,7 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
                 context,
                 MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoice: inv)),
               ),
-              onLongPress: () => _confirmDelete(inv.id, inv.invoiceNo),
+              onLongPress: () => _confirmDelete(inv.id, inv.invoiceNo.isNotEmpty ? inv.invoiceNo : 'Draft'),
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(
@@ -262,7 +258,11 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
                           ),
                           child: Center(
                             child: Text(
-                              inv.invoiceNo.length > 6 ? inv.invoiceNo.substring(inv.invoiceNo.length - 4) : inv.invoiceNo,
+                              inv.invoiceNo.isNotEmpty
+                                  ? (inv.invoiceNo.length > 6
+                                      ? inv.invoiceNo.substring(inv.invoiceNo.length - 4)
+                                      : inv.invoiceNo)
+                                  : 'DR',
                               style: AppTypography.bodyMedium.copyWith(
                                 color: typeColor,
                                 fontWeight: FontWeight.bold,
@@ -276,7 +276,9 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(inv.invoiceNo, style: AppTypography.h3.copyWith(fontSize: 14)),
+                              Text(
+                                inv.invoiceNo.isNotEmpty ? inv.invoiceNo : 'Draft',
+                                style: AppTypography.h3.copyWith(fontSize: 14)),
                               const SizedBox(height: 2),
                               Text(
                                 inv.partyName.isNotEmpty ? inv.partyName : inv.partyMobile,

@@ -194,6 +194,7 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
     setState(() => _isSaving = true);
     try {
       final body = {
+        'name': _nameCtrl.text.trim(),
         'customer_type': _customerType,
         'mobile_no': _mobileCtrl.text.trim(),
         'email': _emailCtrl.text.trim(),
