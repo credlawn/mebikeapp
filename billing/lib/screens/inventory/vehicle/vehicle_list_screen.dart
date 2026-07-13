@@ -55,7 +55,7 @@ class _VehicleListScreenState extends ConsumerState<VehicleListScreen>
             const SizedBox(height: 20),
             Text('Delete Vehicle?', style: AppTypography.h2.copyWith(fontSize: 18)),
             const SizedBox(height: 12),
-            Text('Are you sure you want to delete "${item.name}"?',
+            Text('Are you sure you want to delete "${item.fullName.isNotEmpty ? item.fullName : item.name}"?',
               style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
               textAlign: TextAlign.center,
             ),
@@ -209,7 +209,7 @@ class _VehicleListScreenState extends ConsumerState<VehicleListScreen>
                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
                                                 Flexible(
-                                                  child: Text(item.name, style: AppTypography.h3, overflow: TextOverflow.ellipsis),
+                                                  child: Text(item.fullName.isNotEmpty ? item.fullName : item.name, style: AppTypography.h3, overflow: TextOverflow.ellipsis),
                                                 ),
                                                 Text(item.itemCode,
                                                   style: AppTypography.bodySmall.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
@@ -218,22 +218,38 @@ class _VehicleListScreenState extends ConsumerState<VehicleListScreen>
                                             const SizedBox(height: 4),
                                             Row(
                                               children: [
-                                                if (item.mrp > 0) ...[
-                                                  Text('₹ ${item.mrp.toStringAsFixed(0)}',
+                                                if (item.sellingPrice > 0) ...[
+                                                  Text('₹ ${item.sellingPrice.toStringAsFixed(0)}',
                                                     style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
                                                   const SizedBox(width: 8),
                                                   Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
                                                   const SizedBox(width: 8),
                                                 ],
-                                                Text('${item.weight % 1 == 0 ? item.weight.toInt() : item.weight} kg',
-                                                  style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
-                                                const SizedBox(width: 8),
-                                                Text('|', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
-                                                const SizedBox(width: 8),
                                                 Text('GST ${item.gstSlab}%',
                                                   style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
                                               ],
                                             ),
+                                            if (item.color.isNotEmpty)
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 6),
+                                                child: Wrap(
+                                                  spacing: 4, runSpacing: 4,
+                                                  children: item.color.split(',').map((c) {
+                                                    final name = c.trim();
+                                                    return name.isEmpty
+                                                        ? const SizedBox.shrink()
+                                                        : Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                            decoration: BoxDecoration(
+                                                              color: AppColors.primaryLight,
+                                                              borderRadius: BorderRadius.circular(4),
+                                                            ),
+                                                            child: Text(name,
+                                                              style: AppTypography.bodySmall.copyWith(fontSize: 9, color: AppColors.primary, fontWeight: FontWeight.bold)),
+                                                          );
+                                                  }).toList(),
+                                                ),
+                                              ),
                                           ],
                                         ),
                                       ),

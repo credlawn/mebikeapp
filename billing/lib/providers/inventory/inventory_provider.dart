@@ -4,6 +4,7 @@ import '../../models/inventory/battery_model.dart';
 import '../../models/inventory/motor_model.dart';
 import '../../models/inventory/accessory_model.dart';
 import '../../models/inventory/charger_model.dart';
+import '../../models/inventory/color_item_model.dart';
 import '../../pb_service.dart';
 
 class InventoryRepository {
@@ -98,6 +99,16 @@ class InventoryRepository {
   Future<void> deleteCharger(String id) async {
     await _pbService.pb.collection('charger').delete(id);
   }
+
+  // ── Color ──
+  Future<List<ColorItem>> getAllColors() async {
+    final records = await _pbService.pb.collection('color').getFullList(sort: '-created');
+    return records.map((r) => ColorItem.fromJson(r.toJson())).toList();
+  }
+
+  Future<void> createColor(Map<String, dynamic> body) async {
+    await _pbService.pb.collection('color').create(body: body);
+  }
 }
 
 final inventoryRepositoryProvider = Provider((ref) => InventoryRepository());
@@ -180,4 +191,10 @@ final activeChargersProvider = Provider<List<Charger>>((ref) {
 final inactiveChargersProvider = Provider<List<Charger>>((ref) {
   final all = ref.watch(allChargersProvider).value ?? [];
   return all.where((i) => i.status == 'inactive').toList();
+});
+
+// ── Color Providers ──
+final allColorsProvider = FutureProvider<List<ColorItem>>((ref) async {
+  ref.keepAlive();
+  return ref.watch(inventoryRepositoryProvider).getAllColors();
 });

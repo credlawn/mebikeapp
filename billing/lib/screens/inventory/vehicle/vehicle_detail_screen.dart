@@ -32,9 +32,9 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => ref.invalidate(allVehiclesProvider));
       setState(() => _item = Vehicle(
         id: _item.id, collectionId: _item.collectionId,
-        itemCode: _item.itemCode, name: _item.name, status: newStatus,
-        vehicleType: _item.vehicleType, engineCc: _item.engineCc,
-        color: _item.color, mrp: _item.mrp, weight: _item.weight,
+        itemCode: _item.itemCode, name: _item.name, fullName: _item.fullName, status: newStatus,
+        vehicleType: _item.vehicleType, color: _item.color,
+        sellingPrice: _item.sellingPrice,
         gstSlab: _item.gstSlab, hsnCode: _item.hsnCode,
         created: _item.created, updated: _item.updated,
       ));
@@ -51,29 +51,26 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
     final isActive = _item.status == 'active';
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(_item.name)),
+      appBar: AppBar(title: Text(_item.fullName.isNotEmpty ? _item.fullName : _item.name)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             _buildSection('Vehicle Info', [
               _buildRow('Item Code', _item.itemCode),
+              _buildRow('Full Name', _item.fullName),
               _buildRow('Name', _item.name),
-              if (_item.vehicleType.isNotEmpty) _buildRow('Type', _toTitleCase(_item.vehicleType)),
-              if (_item.engineCc.isNotEmpty) _buildRow('Engine CC', _item.engineCc),
-              if (_item.color.isNotEmpty) _buildRow('Color', _item.color),
+              if (_item.vehicleType.isNotEmpty) _buildRow('Type', _item.vehicleType),
+              if (_item.color.isNotEmpty) _buildRow('Colors', _item.color.replaceAll(',', ', ')),
             ]),
             const SizedBox(height: 12),
             _buildSection('Pricing & Compliance', [
-              if (_item.mrp > 0) _buildRow('MRP', '₹${_item.mrp.toStringAsFixed(0)}'),
-              if (_item.weight > 0) _buildRow('Weight', '${_item.weight % 1 == 0 ? _item.weight.toInt() : _item.weight} kg'),
+              if (_item.sellingPrice > 0) _buildRow('Selling Price', '₹${_item.sellingPrice.toStringAsFixed(0)}'),
               _buildRow('GST Slab', '${_item.gstSlab}%'),
               if (_item.hsnCode.isNotEmpty) _buildRow('HSN Code', _item.hsnCode),
             ]),
             const SizedBox(height: 12),
-            _buildSection('Status', [
-              _buildStatusRow(_item.status),
-            ]),
+            _buildSection('Status', [_buildStatusRow(_item.status)]),
           ],
         ),
       ),
@@ -111,8 +108,7 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title, style: AppTypography.h3.copyWith(color: AppColors.primary, fontSize: 13)),
-          const SizedBox(height: 12),
-          ...rows,
+          const SizedBox(height: 12), ...rows,
         ],
       ),
     );
@@ -151,10 +147,5 @@ class _VehicleDetailScreenState extends ConsumerState<VehicleDetailScreen> {
         ],
       ),
     );
-  }
-
-  String _toTitleCase(String text) {
-    if (text.isEmpty) return text;
-    return text[0].toUpperCase() + text.substring(1).toLowerCase();
   }
 }
