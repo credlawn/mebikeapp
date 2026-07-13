@@ -372,14 +372,111 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
     );
     if (batteryResult == null || !mounted) return;
 
-    final batteryCombos = batteryResult['batteryCombos'] as List<Map<String, dynamic>>;
-
     final int gstSlab = vehicle.getDoubleValue('gst_slab').toInt();
     final String hsn = vehicle.getStringValue('hsn_code');
     final String code = vehicle.getStringValue('item_code');
     final String fn = vehicle.getStringValue('full_name');
     final String nm = vehicle.getStringValue('name');
     final String fullName = fn.isNotEmpty ? fn : nm;
+
+    if (batteryResult['noBattery'] == true) {
+      final wbPrice = batteryResult['wbUnitPrice'] as double;
+      for (final c in colorEntries) {
+        final colorName = c['color'] as String;
+        final itemName = '$fullName - $colorName (WB)';
+        final existing = _items.where((i) => i.itemName == itemName).toList();
+        if (existing.any((i) => i.unitPrice == wbPrice)) {
+          if (mounted) AppSnackBars.showError(context, '"$itemName" at ₹$wbPrice already exists');
+          return;
+        }
+        if (existing.any((i) => i.unitPrice != wbPrice)) {
+          final oldItem = existing.first;
+          final oldPrice = oldItem.unitPrice;
+          final oldQty = oldItem.quantity.toInt();
+          final newQty = c['qty'] as int;
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 80),
+              contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+              actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+              content: SizedBox(
+                width: MediaQuery.of(ctx).size.width - 88,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 48, height: 48,
+                      decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), shape: BoxShape.circle),
+                      child: const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 28),
+                    ),
+                    const SizedBox(height: 16),
+                    Text('Price Change', style: AppTypography.h2.copyWith(fontSize: 18)),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Already added Qty-$oldQty at ₹${oldPrice.toStringAsFixed(0)}',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary, height: 1.5),
+                    ),
+                    Text(
+                      'Add Qty-$newQty at ₹${wbPrice.toStringAsFixed(0)}?',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary, height: 1.5),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary, width: 1.2),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Text('Cancel', style: AppTypography.button.copyWith(color: AppColors.primary)),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary, foregroundColor: Colors.white, elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: Text('Add', style: AppTypography.button.copyWith(color: Colors.white)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+          if (confirm != true) return;
+        }
+      }
+      for (final c in colorEntries) {
+        final colorName = c['color'] as String;
+        final qty = c['qty'] as int;
+        _items.add(InvoiceItem(
+          itemType: 'vehicle', itemId: vehicle.id, itemCode: code,
+          itemName: '$fullName - $colorName (WB)',
+          hsnCode: hsn, gstSlab: gstSlab,
+          quantity: qty.toDouble(), unitPrice: wbPrice,
+          isGstInclusive: true,
+        ));
+        _recalculateItem(_items.length - 1);
+      }
+      if (mounted) AppSnackBars.showSuccess(context, '${_items.length} items added');
+      return;
+    }
+
+    final batteryCombos = batteryResult['batteryCombos'] as List<Map<String, dynamic>>;
 
     // Greedy: always match highest qty color with highest qty battery
     var cRemaining = colorEntries.map((c) => Map<String, dynamic>.from(c)).toList();
@@ -405,7 +502,6 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       final int maxB = bRemaining.first['qty'] as int;
 
       if (maxC >= maxB) {
-        // Fill largest color with batteries (largest first)
         final color = cRemaining.first;
         final colorName = color['color'] as String;
         int need = maxC;
@@ -418,20 +514,94 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
           final String bFn = battRec.getStringValue('full_name');
           final String bNm = battRec.getStringValue('name');
           final String bName = bFn.isNotEmpty ? bFn : bNm;
+          final String comboName = '$fullName - $colorName + $bName';
+          final comboPrice = unitRateOf[battRec.id]!;
+          final existing = _items.where((i) => i.itemName == comboName).toList();
+          if (existing.any((i) => i.unitPrice == comboPrice)) {
+            if (mounted) AppSnackBars.showError(context, '"$comboName" at ₹$comboPrice already exists');
+            return;
+          }
+          if (existing.any((i) => i.unitPrice != comboPrice)) {
+            final oldItem = existing.first;
+            final oldPrice = oldItem.unitPrice;
+            final oldQty = oldItem.quantity.toInt();
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 80),
+                contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+                actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                content: SizedBox(
+                  width: MediaQuery.of(ctx).size.width - 88,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 48, height: 48,
+                        decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), shape: BoxShape.circle),
+                        child: const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 28),
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Price Change', style: AppTypography.h2.copyWith(fontSize: 18)),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Already added Qty-$oldQty at ₹${oldPrice.toStringAsFixed(0)}',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary, height: 1.5),
+                      ),
+                      Text(
+                        'Add Qty-$take at ₹${comboPrice.toStringAsFixed(0)}?',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary, height: 1.5),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary, width: 1.2),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: Text('Cancel', style: AppTypography.button.copyWith(color: AppColors.primary)),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary, foregroundColor: Colors.white, elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: Text('Add', style: AppTypography.button.copyWith(color: Colors.white)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+            if (confirm != true) return;
+          }
           _items.add(InvoiceItem(
             itemType: 'vehicle', itemId: vehicle.id, itemCode: code,
-            itemName: '$fullName - $colorName + $bName',
+            itemName: comboName,
             hsnCode: hsn, gstSlab: gstSlab,
-            quantity: take.toDouble(), unitPrice: unitRateOf[battRec.id]!,
+            quantity: take.toDouble(), unitPrice: comboPrice,
             isGstInclusive: true,
           ));
           _recalculateItem(_items.length - 1);
-          batt['qty'] = battQty - take;
           need -= take;
         }
         color['qty'] = need;
       } else {
-        // Fill largest battery with colors (largest first)
         final batt = bRemaining.first;
         final battRec = batt['batteryRecord'] as dynamic;
         final String bFn = battRec.getStringValue('full_name');
@@ -444,15 +614,90 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
           if (colorQty <= 0) continue;
           final int take = need < colorQty ? need : colorQty;
           final colorName = color['color'] as String;
+          final String comboName = '$fullName - $colorName + $bName';
+          final comboPrice = unitRateOf[battRec.id]!;
+          final existing = _items.where((i) => i.itemName == comboName).toList();
+          if (existing.any((i) => i.unitPrice == comboPrice)) {
+            if (mounted) AppSnackBars.showError(context, '"$comboName" at ₹$comboPrice already exists');
+            return;
+          }
+          if (existing.any((i) => i.unitPrice != comboPrice)) {
+            final oldItem = existing.first;
+            final oldPrice = oldItem.unitPrice;
+            final oldQty = oldItem.quantity.toInt();
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 80),
+                contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+                actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                content: SizedBox(
+                  width: MediaQuery.of(ctx).size.width - 88,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 48, height: 48,
+                        decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.1), shape: BoxShape.circle),
+                        child: const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 28),
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Price Change', style: AppTypography.h2.copyWith(fontSize: 18)),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Already added Qty-$oldQty at ₹${oldPrice.toStringAsFixed(0)}',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary, height: 1.5),
+                      ),
+                      Text(
+                        'Add Qty-$take at ₹${comboPrice.toStringAsFixed(0)}?',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary, height: 1.5),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary, width: 1.2),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: Text('Cancel', style: AppTypography.button.copyWith(color: AppColors.primary)),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary, foregroundColor: Colors.white, elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: Text('Add', style: AppTypography.button.copyWith(color: Colors.white)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+            if (confirm != true) return;
+          }
           _items.add(InvoiceItem(
             itemType: 'vehicle', itemId: vehicle.id, itemCode: code,
-            itemName: '$fullName - $colorName + $bName',
+            itemName: comboName,
             hsnCode: hsn, gstSlab: gstSlab,
-            quantity: take.toDouble(), unitPrice: unitRateOf[battRec.id]!,
+            quantity: take.toDouble(), unitPrice: comboPrice,
             isGstInclusive: true,
           ));
           _recalculateItem(_items.length - 1);
-          color['qty'] = colorQty - take;
           need -= take;
         }
         batt['qty'] = need;

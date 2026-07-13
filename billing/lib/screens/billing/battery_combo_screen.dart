@@ -29,6 +29,14 @@ class BatteryComboScreen extends StatefulWidget {
 
 class _BatteryComboScreenState extends State<BatteryComboScreen> {
   final _entries = <BatteryComboEntry>[];
+  bool _noBattery = false;
+  final _wbPriceCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _wbPriceCtrl.dispose();
+    super.dispose();
+  }
 
   int get _batterySum {
     var s = 0;
@@ -37,6 +45,9 @@ class _BatteryComboScreenState extends State<BatteryComboScreen> {
   }
   int get _remaining => widget.totalQty - _batterySum;
   bool get _canAddToInvoice => _entries.isNotEmpty && _remaining == 0;
+  bool get _canFinish => _noBattery
+      ? (double.tryParse(_wbPriceCtrl.text) ?? 0) > 0
+      : _canAddToInvoice;
 
   Future<void> _addBattery() async {
     final rec = await Navigator.of(context).push<dynamic>(
@@ -190,14 +201,21 @@ class _BatteryComboScreenState extends State<BatteryComboScreen> {
   }
 
   void _done() {
-    if (!_canAddToInvoice) return;
-    Navigator.of(context).pop({
-      'batteryCombos': _entries.map((e) => {
-        'batteryRecord': e.batteryRecord,
-        'qty': e.qty,
-        'unitPrice': e.unitPrice,
-      }).toList(),
-    });
+    if (!_canFinish) return;
+    if (_noBattery) {
+      Navigator.of(context).pop({
+        'noBattery': true,
+        'wbUnitPrice': double.parse(_wbPriceCtrl.text),
+      });
+    } else {
+      Navigator.of(context).pop({
+        'batteryCombos': _entries.map((e) => {
+          'batteryRecord': e.batteryRecord,
+          'qty': e.qty,
+          'unitPrice': e.unitPrice,
+        }).toList(),
+      });
+    }
   }
 
   @override
@@ -257,96 +275,152 @@ class _BatteryComboScreenState extends State<BatteryComboScreen> {
             ),
           ),
 
-          // Add battery button
+          // Without Battery toggle
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _remaining > 0 ? _addBattery : null,
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: Text('Add Battery', style: AppTypography.button),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _noBattery ? Colors.orange.withValues(alpha: 0.06) : AppColors.background,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _noBattery ? Colors.orange.withValues(alpha: 0.3) : AppColors.border),
+              ),
+              child: Column(
+                children: [
+                  InkWell(
+                    onTap: () => setState(() => _noBattery = !_noBattery),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _noBattery ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                          size: 22,
+                          color: _noBattery ? AppColors.primary : AppColors.textMuted,
+                        ),
+                        const SizedBox(width: 10),
+                        Text('Without Battery', style: AppTypography.bodyLarge),
+                      ],
+                    ),
+                  ),
+                  if (_noBattery) ...[
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _wbPriceCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Per Unit Price (GST incl.)',
+                        labelStyle: AppTypography.bodySmall,
+                        prefixText: '₹ ',
+                        prefixStyle: AppTypography.bodySmall,
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      style: AppTypography.input,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
 
-          // Battery list
-          Expanded(
-            child: _entries.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.battery_charging_full_outlined, size: 40, color: AppColors.textMuted.withValues(alpha: 0.3)),
-                        const SizedBox(height: 8),
-                        Text('Tap "Add Battery" to begin', style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted)),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                    itemCount: _entries.length,
-                    itemBuilder: (_, i) {
-                      final entry = _entries[i];
-                      final String bFn = entry.batteryRecord.getStringValue('full_name');
-                      final String bNm = entry.batteryRecord.getStringValue('name');
-                      final String bName = bFn.isNotEmpty ? bFn : bNm;
+          if (!_noBattery) ...[
+            // Add battery button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _remaining > 0 ? _addBattery : null,
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: Text('Add Battery', style: AppTypography.button),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ),
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: InkWell(
-                          onTap: () => _editEntry(i),
-                          borderRadius: BorderRadius.circular(10),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 32, height: 32,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(8),
+            // Battery list
+            Expanded(
+              child: _entries.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.battery_charging_full_outlined, size: 40, color: AppColors.textMuted.withValues(alpha: 0.3)),
+                          const SizedBox(height: 8),
+                          Text('Tap "Add Battery" to begin', style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted)),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      itemCount: _entries.length,
+                      itemBuilder: (_, i) {
+                        final entry = _entries[i];
+                        final String bFn = entry.batteryRecord.getStringValue('full_name');
+                        final String bNm = entry.batteryRecord.getStringValue('name');
+                        final String bName = bFn.isNotEmpty ? bFn : bNm;
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: InkWell(
+                            onTap: () => _editEntry(i),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 32, height: 32,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.battery_charging_full_outlined, size: 16, color: AppColors.primary),
                                   ),
-                                  child: const Icon(Icons.battery_charging_full_outlined, size: 16, color: AppColors.primary),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(bName, style: AppTypography.bodyLarge),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '× ${entry.qty}  •  ₹${entry.unitPrice.toStringAsFixed(0)}/unit',
-                                        style: AppTypography.bodySmall.copyWith(fontSize: 12, color: AppColors.textMuted),
-                                      ),
-                                    ],
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(bName, style: AppTypography.bodyLarge),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '× ${entry.qty}  •  ₹${entry.unitPrice.toStringAsFixed(0)}/unit',
+                                          style: AppTypography.bodySmall.copyWith(fontSize: 12, color: AppColors.textMuted),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                InkWell(
-                                  onTap: () => _removeEntry(i),
-                                  child: Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
-                                ),
-                              ],
+                                  InkWell(
+                                    onTap: () => _removeEntry(i),
+                                    child: Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
 
+          if (_noBattery) const Spacer(),
+
+          // Bottom bar
           // Bottom bar
           Container(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
@@ -354,33 +428,38 @@ class _BatteryComboScreenState extends State<BatteryComboScreen> {
               border: Border(top: BorderSide(color: AppColors.border)),
             ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Total assigned', style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted)),
-                    Text(
-                      '$_batterySum / ${widget.totalQty}',
-                      style: AppTypography.h3.copyWith(
-                        color: _remaining == 0 ? AppColors.success : Colors.orange,
-                        fontSize: 16,
+                if (!_noBattery)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Total assigned', style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted)),
+                      Text(
+                        '$_batterySum / ${widget.totalQty}',
+                        style: AppTypography.h3.copyWith(
+                          color: _remaining == 0 ? AppColors.success : Colors.orange,
+                          fontSize: 16,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                    ],
+                  ),
+                if (!_noBattery) const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: _canAddToInvoice ? _done : null,
+                    onPressed: _canFinish ? _done : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Add to Invoice', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                    child: Text(
+                      _noBattery ? 'Continue' : 'Add to Invoice',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
               ],
