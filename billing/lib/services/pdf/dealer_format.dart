@@ -112,7 +112,7 @@ class DealerInvoiceFormat {
               pw.Expanded(
                 flex: 3,
                 child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                   mainAxisSize: pw.MainAxisSize.min,
                   children: [
                     if (c.businessName.isNotEmpty)
@@ -158,31 +158,27 @@ class DealerInvoiceFormat {
 
   static pw.Widget _metaSection(Invoice inv) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.only(top: 18),
-      child: pw.Column(
+      padding: const pw.EdgeInsets.only(top: 10),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Row(
-            children: [
-              pw.Expanded(child: _metaField('Invoice No', inv.invoiceNo.isNotEmpty ? inv.invoiceNo : '-')),
-              pw.Expanded(child: _metaField('GR/RR No', '-')),
-              pw.Expanded(child: _metaField('Dated', PdfHelpers.fmtDate(inv.invoiceDate))),
-            ],
+          pw.Expanded(
+            child: pw.Column(
+              children: [
+                _metaField('Invoice No', inv.invoiceNo.isNotEmpty ? inv.invoiceNo : '-'),
+                _metaField('Date', PdfHelpers.fmtDate(inv.invoiceDate)),
+                _metaField('Reverse Charge', 'N'),
+              ],
+            ),
           ),
-          pw.SizedBox(height: 4),
-          pw.Row(
-            children: [
-              pw.Expanded(child: _metaField('Transport', '-')),
-              pw.Expanded(child: _metaField('Vehicle No', '-')),
-              pw.Expanded(child: _metaField('Place of Supply', inv.partyState.isNotEmpty ? '${inv.partyState} (${inv.partyStateCode})' : '-')),
-            ],
-          ),
-          pw.SizedBox(height: 4),
-          pw.Row(
-            children: [
-              pw.Expanded(child: _metaField('Station', '-')),
-              pw.Expanded(child: _metaField('Reverse Charge', 'N')),
-              pw.Expanded(child: pw.Container()),
-            ],
+          pw.Expanded(
+            child: pw.Column(
+              children: [
+                _metaField('Place of Supply', inv.partyState.isNotEmpty ? '${inv.partyState} (${inv.partyStateCode})' : '-'),
+                _metaField('GR/RR No', '-'),
+                _metaField('Vehicle No', '-'),
+              ],
+            ),
           ),
         ],
       ),
@@ -197,12 +193,12 @@ class DealerInvoiceFormat {
         children: [
           pw.Expanded(
             child: _addressBox('Buyer (Bill to)', inv.partyName, inv.partyAddress, inv.partyGst,
-                '${inv.partyCity.isNotEmpty ? "City: ${inv.partyCity}" : ""}${inv.partyCity.isNotEmpty && inv.partyState.isNotEmpty ? "\n" : ""}${inv.partyState.isNotEmpty ? "State: ${inv.partyState} (${inv.partyStateCode})" : ""}${inv.partyPincode.isNotEmpty ? "\nPincode: ${inv.partyPincode}" : ""}'),
+                inv.partyStateCode.isNotEmpty ? 'State Code: ${inv.partyStateCode}' : ''),
           ),
           PdfHelpers.sw(20),
           pw.Expanded(
             child: _addressBox('Consignee (Ship to)', inv.partyName, inv.partyAddress, inv.partyGst,
-                '${inv.partyCity.isNotEmpty ? "City: ${inv.partyCity}" : ""}${inv.partyCity.isNotEmpty && inv.partyState.isNotEmpty ? "\n" : ""}${inv.partyState.isNotEmpty ? "State: ${inv.partyState} (${inv.partyStateCode})" : ""}${inv.partyPincode.isNotEmpty ? "\nPincode: ${inv.partyPincode}" : ""}'),
+                inv.partyStateCode.isNotEmpty ? 'State Code: ${inv.partyStateCode}' : ''),
           ),
         ],
       ),
@@ -244,7 +240,7 @@ class DealerInvoiceFormat {
     final hStyle = PdfTheme.med(8.5, color: PdfTheme.dark);
     final cStyle = PdfTheme.reg(8.5, color: PdfTheme.dark);
     final cBold = PdfTheme.med(8.5, color: PdfTheme.dark);
-    final headers = ['S.No', 'Description of Goods', 'HSN/SAC', 'Qty', 'Unit', 'Rate (\u20B9)', 'Amount (\u20B9)'];
+    final headers = ['S.N', 'Description of Goods', 'HSN/SAC', 'Qty', 'Unit', 'Rate (\u20B9)', 'Amount (\u20B9)'];
     final colW = [0.4, 2.8, 0.8, 0.4, 0.5, 0.8, 1.0];
 
     return pw.Table(
@@ -277,8 +273,8 @@ class DealerInvoiceFormat {
               PdfHelpers.cell(i.hsnCode, cStyle, pw.TextAlign.center),
               PdfHelpers.cell(i.quantity.toInt().toString(), cStyle, pw.TextAlign.center),
               PdfHelpers.cell('Nos', cStyle, pw.TextAlign.center),
-              PdfHelpers.cell(PdfHelpers.fmt(i.unitPrice), cStyle, pw.TextAlign.right),
-              PdfHelpers.cell(PdfHelpers.fmt(i.total), cBold, pw.TextAlign.right),
+              PdfHelpers.cell(PdfHelpers.fmt(i.taxableValue / i.quantity), cStyle, pw.TextAlign.right),
+              PdfHelpers.cell(PdfHelpers.fmt(i.taxableValue), cBold, pw.TextAlign.right),
             ],
           );
         }),
