@@ -66,43 +66,76 @@ class DealerInvoiceFormat {
   static pw.Widget _header(Company c, Uint8List? logoBytes) {
     return pw.Container(
       width: double.infinity,
-      padding: const pw.EdgeInsets.fromLTRB(30, 20, 30, 20),
+      padding: const pw.EdgeInsets.fromLTRB(24, 12, 24, 12),
       decoration: pw.BoxDecoration(
         color: PdfColors.white,
-        border: pw.Border(bottom: pw.BorderSide(color: PdfTheme.primary, width: 3)),
+        border: pw.Border(bottom: pw.BorderSide(color: PdfTheme.primary, width: 2.5)),
       ),
       child: pw.Column(
         children: [
-          pw.Text('T A X   I N V O I C E',
-            style: PdfTheme.sb(22, color: PdfTheme.primary).copyWith(letterSpacing: 3)),
-          if (c.businessName.isNotEmpty)
-            pw.Padding(
-              padding: const pw.EdgeInsets.only(top: 4),
-              child: pw.Text(c.businessName, style: PdfTheme.med(16, color: PdfTheme.dark)),
-            ),
-          pw.SizedBox(height: 6),
-          if (logoBytes != null)
-            pw.Container(
-              width: 60, height: 60,
-              child: pw.Image(pw.MemoryImage(logoBytes), fit: pw.BoxFit.contain),
-            ),
-          if (c.address.isNotEmpty || c.city.isNotEmpty)
-            pw.Text(
-              [c.address, c.city, c.state, c.pincode].where((e) => e.isNotEmpty).join(', '),
-              style: PdfTheme.reg(10, color: PdfTheme.dark_09)),
-          if (c.mobileNo.isNotEmpty)
-            pw.Text('Ph: ${c.mobileNo} | Email: ${c.email}',
-              style: PdfTheme.reg(9, color: PdfTheme.dark_08)),
-          if (c.gstNo.isNotEmpty)
-            pw.Container(
-              margin: const pw.EdgeInsets.only(top: 6),
-              padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: pw.BoxDecoration(
-                color: PdfTheme.primary_015,
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(20)),
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              if (logoBytes != null) pw.SizedBox(width: 60),
+              pw.Expanded(
+                child: pw.Text('TAX INVOICE',
+                  textAlign: pw.TextAlign.center,
+                  style: PdfTheme.sb(16, color: PdfTheme.primary).copyWith(letterSpacing: 1)),
               ),
-              child: pw.Text('GSTIN: ${c.gstNo}', style: PdfTheme.reg(10, color: PdfTheme.primary)),
-            ),
+              if (logoBytes != null) pw.SizedBox(width: 12),
+              if (logoBytes != null)
+                pw.Container(
+                  width: 48, height: 48,
+                  child: pw.Image(pw.MemoryImage(logoBytes), fit: pw.BoxFit.contain),
+                ),
+            ],
+          ),
+          pw.SizedBox(height: 6),
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Expanded(
+                flex: 3,
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  mainAxisSize: pw.MainAxisSize.min,
+                  children: [
+                    if (c.businessName.isNotEmpty)
+                      pw.Text(c.businessName, style: PdfTheme.med(12, color: PdfTheme.dark)),
+                    if (c.address.isNotEmpty)
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.only(top: 2),
+                        child: pw.Text(c.address, style: PdfTheme.reg(8, color: PdfTheme.dark_09)),
+                      ),
+                    if (c.gstNo.isNotEmpty)
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.only(top: 2),
+                        child: pw.Text('GSTIN: ${c.gstNo}',
+                          style: PdfTheme.reg(8.5, color: PdfTheme.dark)),
+                      ),
+                  ],
+                ),
+              ),
+              if (c.mobileNo.isNotEmpty)
+                pw.Expanded(
+                  flex: 2,
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    mainAxisSize: pw.MainAxisSize.min,
+                    children: [
+                      pw.Text('Ph: ${c.mobileNo}',
+                        style: PdfTheme.reg(7.5, color: PdfTheme.dark_08)),
+                      if (c.email.isNotEmpty)
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.only(top: 1),
+                          child: pw.Text(c.email,
+                            style: PdfTheme.reg(7.5, color: PdfTheme.dark_08)),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
