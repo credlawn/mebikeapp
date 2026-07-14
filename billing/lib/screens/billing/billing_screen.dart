@@ -42,6 +42,10 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
   String _partyGst = '';
   String _partyAddress = '';
   String _partyStateCode = '';
+  String _partyCity = '';
+  String _partyDistrict = '';
+  String _partyState = '';
+  String _partyPincode = '';
 
   final List<InvoiceItem> _items = [];
 
@@ -61,6 +65,10 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       _partyGst = c.gstNo;
       _partyStateCode = c.stateCode;
       _partyAddress = [c.address, c.city, c.district, c.state, c.pincode].where((e) => e.isNotEmpty).join(', ');
+      _partyCity = c.city;
+      _partyDistrict = c.district;
+      _partyState = c.state;
+      _partyPincode = c.pincode;
     } else if (widget.partner != null) {
       final p = widget.partner!;
       _partyName = p.partnerName;
@@ -68,6 +76,10 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       _partyGst = p.gstNo;
       _partyStateCode = p.stateCode;
       _partyAddress = p.billingAddress;
+      _partyCity = p.billingCity;
+      _partyDistrict = '';
+      _partyState = p.billingState;
+      _partyPincode = p.billingPincode;
     }
   }
 
@@ -814,6 +826,10 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
         'party_gst': _partyGst,
         'party_state_code': _partyStateCode,
         'party_address': _partyAddress,
+        'party_city': _partyCity,
+        'party_district': _partyDistrict,
+        'party_state': _partyState,
+        'party_pincode': _partyPincode,
         'items': _items.map((e) => e.toJson()).toList(),
         'subtotal': _subtotal,
         'discount': _discount,

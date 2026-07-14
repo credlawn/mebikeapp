@@ -32,9 +32,11 @@ class DealerInvoiceFormat {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(0),
+        header: (ctx) => pw.SizedBox(height: 24),
         build: (ctx) => [
+          // Pre-table section
           pw.Container(
-            margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 24),
+            margin: const pw.EdgeInsets.only(left: 36, right: 36, top: 24),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -42,7 +44,20 @@ class DealerInvoiceFormat {
                 _metaSection(inv),
                 _addressSection(inv, company),
                 PdfHelpers.sp(20),
-                _itemsTable(inv),
+              ],
+            ),
+          ),
+          // Items table — direct child of MultiPage so it can span pages
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 36),
+            child: _itemsTable(inv),
+          ),
+          // Post-table section
+          pw.Container(
+            margin: const pw.EdgeInsets.only(left: 36, right: 36, bottom: 24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
                 PdfHelpers.sp(16),
                 _totalsSection(inv, sortedSlabs, itemsBySlab),
                 PdfHelpers.sp(16),
@@ -232,45 +247,42 @@ class DealerInvoiceFormat {
     final headers = ['S.No', 'Description of Goods', 'HSN/SAC', 'Qty', 'Unit', 'Rate (\u20B9)', 'Amount (\u20B9)'];
     final colW = [0.4, 2.8, 0.8, 0.4, 0.5, 0.8, 1.0];
 
-    return pw.Container(
-      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfTheme.border)),
-      child: pw.Table(
-        border: pw.TableBorder(
-          horizontalInside: pw.BorderSide(color: PdfTheme.border, width: 0.5),
-          verticalInside: pw.BorderSide(color: PdfTheme.border, width: 0.5),
-        ),
-        columnWidths: Map.fromIterables(
-          List.generate(headers.length, (i) => i),
-          colW.map((w) => pw.FlexColumnWidth(w)),
-        ),
-        children: [
-          pw.TableRow(
-            decoration: pw.BoxDecoration(
-              gradient: pw.LinearGradient(
-                colors: [PdfTheme.headerBg, PdfColor.fromInt(0xFFEEF2F6)],
-                begin: pw.Alignment.topCenter, end: pw.Alignment.bottomCenter,
-              ),
-            ),
-            children: headers.map((h) => PdfHelpers.headCell(h, hStyle)).toList(),
-          ),
-          ...inv.items.asMap().entries.map((e) {
-            final i = e.value;
-            final idx = e.key + 1;
-            return pw.TableRow(
-              decoration: idx % 2 == 0 ? pw.BoxDecoration(color: PdfTheme.evenRow) : null,
-              children: [
-                PdfHelpers.cell('$idx', cStyle, pw.TextAlign.center),
-                PdfHelpers.cell(i.itemName, cStyle, pw.TextAlign.left, maxLines: 2),
-                PdfHelpers.cell(i.hsnCode, cStyle, pw.TextAlign.center),
-                PdfHelpers.cell(i.quantity.toInt().toString(), cStyle, pw.TextAlign.center),
-                PdfHelpers.cell('Nos', cStyle, pw.TextAlign.center),
-                PdfHelpers.cell(PdfHelpers.fmt(i.unitPrice), cStyle, pw.TextAlign.right),
-                PdfHelpers.cell(PdfHelpers.fmt(i.total), cBold, pw.TextAlign.right),
-              ],
-            );
-          }),
-        ],
+    return pw.Table(
+      border: pw.TableBorder(
+        horizontalInside: pw.BorderSide(color: PdfTheme.border, width: 0.5),
+        verticalInside: pw.BorderSide(color: PdfTheme.border, width: 0.5),
       ),
+      columnWidths: Map.fromIterables(
+        List.generate(headers.length, (i) => i),
+        colW.map((w) => pw.FlexColumnWidth(w)),
+      ),
+      children: [
+        pw.TableRow(
+          decoration: pw.BoxDecoration(
+            gradient: pw.LinearGradient(
+              colors: [PdfTheme.headerBg, PdfColor.fromInt(0xFFEEF2F6)],
+              begin: pw.Alignment.topCenter, end: pw.Alignment.bottomCenter,
+            ),
+          ),
+          children: headers.map((h) => PdfHelpers.headCell(h, hStyle)).toList(),
+        ),
+        ...inv.items.asMap().entries.map((e) {
+          final i = e.value;
+          final idx = e.key + 1;
+          return pw.TableRow(
+            decoration: idx % 2 == 0 ? pw.BoxDecoration(color: PdfTheme.evenRow) : null,
+            children: [
+              PdfHelpers.cell('$idx', cStyle, pw.TextAlign.center),
+              PdfHelpers.cell(i.itemName, cStyle, pw.TextAlign.left, maxLines: 2),
+              PdfHelpers.cell(i.hsnCode, cStyle, pw.TextAlign.center),
+              PdfHelpers.cell(i.quantity.toInt().toString(), cStyle, pw.TextAlign.center),
+              PdfHelpers.cell('Nos', cStyle, pw.TextAlign.center),
+              PdfHelpers.cell(PdfHelpers.fmt(i.unitPrice), cStyle, pw.TextAlign.right),
+              PdfHelpers.cell(PdfHelpers.fmt(i.total), cBold, pw.TextAlign.right),
+            ],
+          );
+        }),
+      ],
     );
   }
 
@@ -341,6 +353,7 @@ class DealerInvoiceFormat {
         ),
         children: [
           pw.TableRow(
+            repeat: true,
             decoration: pw.BoxDecoration(
               gradient: pw.LinearGradient(
                 colors: [PdfTheme.headerBg, PdfColor.fromInt(0xFFEEF2F6)],

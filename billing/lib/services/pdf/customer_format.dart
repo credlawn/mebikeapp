@@ -32,9 +32,11 @@ class CustomerInvoiceFormat {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(0),
+        header: (ctx) => pw.SizedBox(height: 24),
         build: (ctx) => [
+          // Pre-table section
           pw.Container(
-            margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 24),
+            margin: const pw.EdgeInsets.only(left: 36, right: 36, top: 24),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
@@ -42,7 +44,20 @@ class CustomerInvoiceFormat {
                 _metaSection(inv, company),
                 _addressSection(inv, company),
                 PdfHelpers.sp(20),
-                _itemsTable(inv),
+              ],
+            ),
+          ),
+          // Items table — direct child of MultiPage so it can span pages
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 36),
+            child: _itemsTable(inv),
+          ),
+          // Post-table section
+          pw.Container(
+            margin: const pw.EdgeInsets.only(left: 36, right: 36, bottom: 24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
                 PdfHelpers.sp(16),
                 _totalsSection(inv, sortedSlabs, itemsBySlab),
                 PdfHelpers.sp(16),
@@ -229,6 +244,7 @@ class CustomerInvoiceFormat {
         ),
         children: [
           pw.TableRow(
+            repeat: true,
             decoration: pw.BoxDecoration(
               gradient: pw.LinearGradient(
                 colors: [PdfTheme.headerBg, PdfColor.fromInt(0xFFEEF2F6)],
