@@ -160,10 +160,24 @@ class CustomerInvoiceFormat {
     return pw.Padding(
       padding: const pw.EdgeInsets.only(top: 18),
       child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Expanded(child: _metaField('Invoice No', inv.invoiceNo.isNotEmpty ? inv.invoiceNo : '-')),
-          pw.Expanded(child: _metaField('ME Customer ID', inv.partyGst.isNotEmpty ? inv.partyGst : '-')),
-          pw.Expanded(child: _metaField('Dated', PdfHelpers.fmtDate(inv.invoiceDate))),
+          pw.Expanded(
+            child: pw.Column(
+              children: [
+                _metaField('Invoice No', inv.invoiceNo.isNotEmpty ? inv.invoiceNo : '-'),
+                _metaField('Date', PdfHelpers.fmtDate(inv.invoiceDate)),
+              ],
+            ),
+          ),
+          pw.Expanded(
+            child: pw.Column(
+              children: [
+                _metaField('Customer ID', inv.partyCustomerCode.isNotEmpty ? inv.partyCustomerCode : (inv.partyGst.isNotEmpty ? inv.partyGst : '-')),
+                _metaField('Dealer Code', inv.partyPartnerCode.isNotEmpty ? inv.partyPartnerCode : '-'),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -260,7 +274,7 @@ class CustomerInvoiceFormat {
               decoration: idx % 2 == 0 ? pw.BoxDecoration(color: PdfTheme.evenRow) : null,
               children: [
                 PdfHelpers.cell('$idx', cStyle, pw.TextAlign.center),
-                PdfHelpers.comboCell(i.itemName, cStyle),
+                PdfHelpers.cell(i.itemName, cStyle, pw.TextAlign.left, maxLines: 2),
                 PdfHelpers.cell(i.hsnCode, cStyle, pw.TextAlign.center),
                 PdfHelpers.cell(i.quantity.toInt().toString(), cStyle, pw.TextAlign.center),
                 PdfHelpers.cell('Nos', cStyle, pw.TextAlign.center),

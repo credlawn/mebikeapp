@@ -105,6 +105,8 @@ class Invoice {
   final String partyDistrict;
   final String partyState;
   final String partyPincode;
+  final String partyCustomerCode;
+  final String partyPartnerCode;
   final List<InvoiceItem> items;
   final double subtotal;
   final double discount;
@@ -143,6 +145,8 @@ class Invoice {
     this.partyDistrict = '',
     this.partyState = '',
     this.partyPincode = '',
+    this.partyCustomerCode = '',
+    this.partyPartnerCode = '',
     required this.items,
     this.subtotal = 0,
     this.discount = 0,
@@ -200,6 +204,8 @@ class Invoice {
       partyDistrict: json['party_district'] ?? '',
       partyState: json['party_state'] ?? '',
       partyPincode: json['party_pincode'] ?? '',
+      partyCustomerCode: json['party_customer_code'] ?? '',
+      partyPartnerCode: json['party_partner_code'] ?? '',
       items: itemsList,
       subtotal: (json['subtotal'] ?? 0).toDouble(),
       discount: (json['discount'] ?? 0).toDouble(),
@@ -237,6 +243,8 @@ class Invoice {
     'party_district': partyDistrict,
     'party_state': partyState,
     'party_pincode': partyPincode,
+    'party_customer_code': partyCustomerCode,
+    'party_partner_code': partyPartnerCode,
     'items': items.map((e) => e.toJson()).toList(),
     'subtotal': subtotal,
     'discount': discount,

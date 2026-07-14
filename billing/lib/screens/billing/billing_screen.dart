@@ -831,6 +831,8 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
         'party_district': _partyDistrict,
         'party_state': _partyState,
         'party_pincode': _partyPincode,
+        'party_customer_code': _invoiceType == 'customer' ? (widget.customer?.customerId ?? '') : '',
+        'party_partner_code': _invoiceType == 'partner' ? (widget.partner?.partnerCode ?? '') : '',
         'items': _items.map((e) => e.toJson()).toList(),
         'subtotal': _subtotal,
         'discount': _discount,

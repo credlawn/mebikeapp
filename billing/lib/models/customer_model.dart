@@ -18,6 +18,7 @@ class Customer {
   final String state;
   final String pincode;
   final String status;
+  final String customerId;
   final DateTime created;
   final DateTime updated;
 
@@ -41,6 +42,7 @@ class Customer {
     required this.state,
     required this.pincode,
     required this.status,
+    required this.customerId,
     required this.created,
     required this.updated,
   });
@@ -66,6 +68,7 @@ class Customer {
       state: json['state'] ?? '',
       pincode: json['pincode'] ?? '',
       status: json['status'] ?? 'active',
+      customerId: json['customer_id'] ?? '',
       created: DateTime.parse(json['created']),
       updated: DateTime.parse(json['updated']),
     );
@@ -89,6 +92,7 @@ class Customer {
       'state': state,
       'pincode': pincode,
       'status': status,
+      'customer_id': customerId,
     };
   }
 }
