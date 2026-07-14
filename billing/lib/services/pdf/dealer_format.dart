@@ -1,0 +1,393 @@
+import 'dart:typed_data';
+import 'package:http/http.dart' as http;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import '../../config.dart';
+import '../../models/invoice_model.dart';
+import '../../models/company_model.dart';
+import 'theme.dart';
+
+class DealerInvoiceFormat {
+  static Future<Uint8List> generate(Invoice inv, Company company) async {
+    await PdfTheme.loadFonts();
+
+    Uint8List? logoBytes;
+    if (company.logo.isNotEmpty) {
+      try {
+        final url = '${AppConfig.pocketbaseUrl}/api/files/${company.collectionId}/${company.id}/${company.logo}';
+        final resp = await http.get(Uri.parse(url));
+        if (resp.statusCode == 200) logoBytes = resp.bodyBytes;
+      } catch (_) {}
+    }
+
+    final itemsBySlab = <int, List<InvoiceItem>>{};
+    for (final item in inv.items) {
+      itemsBySlab.putIfAbsent(item.gstSlab, () => []).add(item);
+    }
+    final sortedSlabs = itemsBySlab.keys.toList()..sort();
+
+    final doc = pw.Document();
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(0),
+        build: (ctx) => [
+          pw.Container(
+            margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                _header(company, logoBytes),
+                _metaSection(inv),
+                _addressSection(inv, company),
+                PdfHelpers.sp(20),
+                _itemsTable(inv),
+                PdfHelpers.sp(16),
+                _totalsSection(inv, sortedSlabs, itemsBySlab),
+                PdfHelpers.sp(16),
+                _taxSummary(sortedSlabs, itemsBySlab, inv),
+                PdfHelpers.sp(16),
+                _amountInWords(inv),
+                PdfHelpers.sp(40),
+                _signatureSection(),
+                PdfHelpers.sp(20),
+                _footer(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return doc.save();
+  }
+
+  static pw.Widget _header(Company c, Uint8List? logoBytes) {
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.fromLTRB(30, 20, 30, 20),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.white,
+        border: pw.Border(bottom: pw.BorderSide(color: PdfTheme.primary, width: 3)),
+      ),
+      child: pw.Column(
+        children: [
+          pw.Text('T A X   I N V O I C E',
+            style: PdfTheme.sb(22, color: PdfTheme.primary).copyWith(letterSpacing: 3)),
+          if (c.businessName.isNotEmpty)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 4),
+              child: pw.Text(c.businessName, style: PdfTheme.med(16, color: PdfTheme.dark)),
+            ),
+          pw.SizedBox(height: 6),
+          if (logoBytes != null)
+            pw.Container(
+              width: 60, height: 60,
+              child: pw.Image(pw.MemoryImage(logoBytes), fit: pw.BoxFit.contain),
+            ),
+          if (c.address.isNotEmpty || c.city.isNotEmpty)
+            pw.Text(
+              [c.address, c.city, c.state, c.pincode].where((e) => e.isNotEmpty).join(', '),
+              style: PdfTheme.reg(10, color: PdfTheme.dark_09)),
+          if (c.mobileNo.isNotEmpty)
+            pw.Text('Ph: ${c.mobileNo} | Email: ${c.email}',
+              style: PdfTheme.reg(9, color: PdfTheme.dark_08)),
+          if (c.gstNo.isNotEmpty)
+            pw.Container(
+              margin: const pw.EdgeInsets.only(top: 6),
+              padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: pw.BoxDecoration(
+                color: PdfTheme.primary_015,
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(20)),
+              ),
+              child: pw.Text('GSTIN: ${c.gstNo}', style: PdfTheme.reg(10, color: PdfTheme.primary)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _metaSection(Invoice inv) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(top: 18),
+      child: pw.Column(
+        children: [
+          pw.Row(
+            children: [
+              pw.Expanded(child: _metaField('Invoice No', inv.invoiceNo.isNotEmpty ? inv.invoiceNo : '-')),
+              pw.Expanded(child: _metaField('GR/RR No', '-')),
+              pw.Expanded(child: _metaField('Dated', PdfHelpers.fmtDate(inv.invoiceDate))),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          pw.Row(
+            children: [
+              pw.Expanded(child: _metaField('Transport', '-')),
+              pw.Expanded(child: _metaField('Vehicle No', '-')),
+              pw.Expanded(child: _metaField('Place of Supply', inv.partyState.isNotEmpty ? '${inv.partyState} (${inv.partyStateCode})' : '-')),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          pw.Row(
+            children: [
+              pw.Expanded(child: _metaField('Station', '-')),
+              pw.Expanded(child: _metaField('Reverse Charge', 'N')),
+              pw.Expanded(child: pw.Container()),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _addressSection(Invoice inv, Company company) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(top: 16),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Expanded(
+            child: _addressBox('Buyer (Bill to)', inv.partyName, inv.partyAddress, inv.partyGst,
+                '${inv.partyCity.isNotEmpty ? "City: ${inv.partyCity}" : ""}${inv.partyCity.isNotEmpty && inv.partyState.isNotEmpty ? "\n" : ""}${inv.partyState.isNotEmpty ? "State: ${inv.partyState} (${inv.partyStateCode})" : ""}${inv.partyPincode.isNotEmpty ? "\nPincode: ${inv.partyPincode}" : ""}'),
+          ),
+          PdfHelpers.sw(20),
+          pw.Expanded(
+            child: _addressBox('Consignee (Ship to)', inv.partyName, inv.partyAddress, inv.partyGst,
+                '${inv.partyCity.isNotEmpty ? "City: ${inv.partyCity}" : ""}${inv.partyCity.isNotEmpty && inv.partyState.isNotEmpty ? "\n" : ""}${inv.partyState.isNotEmpty ? "State: ${inv.partyState} (${inv.partyStateCode})" : ""}${inv.partyPincode.isNotEmpty ? "\nPincode: ${inv.partyPincode}" : ""}'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _addressBox(String title, String name, String? addr, String? gst, String extra) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(14),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfTheme.border),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+        color: PdfTheme.headerBg,
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(title, style: PdfTheme.med(12, color: PdfTheme.primary)),
+          pw.Container(height: 1, margin: const pw.EdgeInsets.symmetric(vertical: 6), color: PdfTheme.border),
+          pw.Text(name, style: PdfTheme.sb(10.5, color: PdfTheme.dark)),
+          if (addr != null && addr.isNotEmpty) ...[
+            PdfHelpers.sp(2),
+            pw.Text(addr, style: PdfTheme.reg(9, color: PdfTheme.dark_08)),
+          ],
+          if (gst != null && gst.isNotEmpty) ...[
+            PdfHelpers.sp(4),
+            pw.Text('GSTIN: $gst', style: PdfTheme.med(9, color: PdfTheme.dark)),
+          ],
+          if (extra.isNotEmpty) ...[
+            PdfHelpers.sp(2),
+            pw.Text(extra, style: PdfTheme.reg(9, color: PdfTheme.dark_08)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _itemsTable(Invoice inv) {
+    final hStyle = PdfTheme.med(8.5, color: PdfTheme.dark);
+    final cStyle = PdfTheme.reg(8.5, color: PdfTheme.dark);
+    final cBold = PdfTheme.med(8.5, color: PdfTheme.dark);
+    final headers = ['S.No', 'Description of Goods', 'HSN/SAC', 'Qty', 'Unit', 'Rate (\u20B9)', 'Amount (\u20B9)'];
+    final colW = [0.4, 2.8, 0.8, 0.4, 0.5, 0.8, 1.0];
+
+    return pw.Container(
+      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfTheme.border)),
+      child: pw.Table(
+        border: pw.TableBorder(
+          horizontalInside: pw.BorderSide(color: PdfTheme.border, width: 0.5),
+          verticalInside: pw.BorderSide(color: PdfTheme.border, width: 0.5),
+        ),
+        columnWidths: Map.fromIterables(
+          List.generate(headers.length, (i) => i),
+          colW.map((w) => pw.FlexColumnWidth(w)),
+        ),
+        children: [
+          pw.TableRow(
+            decoration: pw.BoxDecoration(
+              gradient: pw.LinearGradient(
+                colors: [PdfTheme.headerBg, PdfColor.fromInt(0xFFEEF2F6)],
+                begin: pw.Alignment.topCenter, end: pw.Alignment.bottomCenter,
+              ),
+            ),
+            children: headers.map((h) => PdfHelpers.headCell(h, hStyle)).toList(),
+          ),
+          ...inv.items.asMap().entries.map((e) {
+            final i = e.value;
+            final idx = e.key + 1;
+            return pw.TableRow(
+              decoration: idx % 2 == 0 ? pw.BoxDecoration(color: PdfTheme.evenRow) : null,
+              children: [
+                PdfHelpers.cell('$idx', cStyle, pw.TextAlign.center),
+                PdfHelpers.cell(i.itemName, cStyle, pw.TextAlign.left, maxLines: 2),
+                PdfHelpers.cell(i.hsnCode, cStyle, pw.TextAlign.center),
+                PdfHelpers.cell(i.quantity.toInt().toString(), cStyle, pw.TextAlign.center),
+                PdfHelpers.cell('Nos', cStyle, pw.TextAlign.center),
+                PdfHelpers.cell(PdfHelpers.fmt(i.unitPrice), cStyle, pw.TextAlign.right),
+                PdfHelpers.cell(PdfHelpers.fmt(i.total), cBold, pw.TextAlign.right),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _totalsSection(Invoice inv, List<int> slabs, Map<int, List<InvoiceItem>> bySlab) {
+    final cStyle = PdfTheme.reg(9.5, color: PdfTheme.dark);
+    final cB = PdfTheme.med(9.5, color: PdfTheme.dark);
+    final gStyle = PdfTheme.sb(14, color: PdfTheme.primary);
+    final totalTaxable = inv.taxable;
+
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(16),
+      decoration: pw.BoxDecoration(
+        color: PdfTheme.totalBg,
+        border: pw.Border.all(color: PdfTheme.border),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+      ),
+      child: pw.Column(
+        children: [
+          _totalRow('Totals c/o', PdfHelpers.fmt(inv.subtotal), cStyle),
+          if (inv.discount > 0) _totalRow('Less: Discount', PdfHelpers.fmt(inv.discount), cStyle),
+          _dashLine(),
+          _totalRow('Sub Total', PdfHelpers.fmt(totalTaxable), cB),
+          for (final slab in slabs)
+            _totalRow('Add: IGST @ $slab%', PdfHelpers.fmt(bySlab[slab]!.fold(0.0, (s, i) => s + i.cgstAmount + i.sgstAmount + i.igstAmount)), cStyle),
+          _dashLine(),
+          _totalRow('Grand Total', PdfHelpers.fmt(inv.grandTotal), gStyle),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _totalRow(String label, String value, pw.TextStyle style) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 3),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(label, style: style),
+          pw.Text('\u20B9 $value', style: style),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _dashLine() {
+    return pw.Container(margin: const pw.EdgeInsets.symmetric(vertical: 4), height: 0.5, color: PdfTheme.border);
+  }
+
+  static pw.Widget _taxSummary(List<int> slabs, Map<int, List<InvoiceItem>> bySlab, Invoice inv) {
+    final hStyle = PdfTheme.med(8.5, color: PdfTheme.dark);
+    final cStyle = PdfTheme.reg(8.5, color: PdfTheme.dark);
+    final cB = PdfTheme.med(8.5, color: PdfTheme.dark);
+    final isInter = inv.igstTotal > 0;
+    final headers = ['Tax Rate', 'Taxable Amount (\u20B9)', isInter ? 'IGST (\u20B9)' : 'CGST (\u20B9)', isInter ? '' : 'SGST (\u20B9)', 'Total Tax (\u20B9)']
+        .where((h) => h.isNotEmpty).toList();
+    final colW = [1.0, 1.2, isInter ? 1.0 : 1.0, isInter ? 0.0 : 1.0, 1.0].where((w) => w > 0).toList();
+
+    return pw.Container(
+      decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfTheme.border)),
+      child: pw.Table(
+        border: pw.TableBorder(
+          horizontalInside: pw.BorderSide(color: PdfTheme.border, width: 0.5),
+          verticalInside: pw.BorderSide(color: PdfTheme.border, width: 0.5),
+        ),
+        columnWidths: Map.fromIterables(
+          List.generate(colW.length, (i) => i),
+          colW.map((w) => pw.FlexColumnWidth(w)),
+        ),
+        children: [
+          pw.TableRow(
+            decoration: pw.BoxDecoration(
+              gradient: pw.LinearGradient(
+                colors: [PdfTheme.headerBg, PdfColor.fromInt(0xFFEEF2F6)],
+                begin: pw.Alignment.topCenter, end: pw.Alignment.bottomCenter,
+              ),
+            ),
+            children: headers.map((h) => PdfHelpers.headCell(h, hStyle)).toList(),
+          ),
+          ...slabs.map((slab) {
+            final items = bySlab[slab]!;
+            final taxable = items.fold(0.0, (s, i) => s + i.taxableValue);
+            final cgst = items.fold(0.0, (s, i) => s + i.cgstAmount);
+            final sgst = items.fold(0.0, (s, i) => s + i.sgstAmount);
+            final igst = items.fold(0.0, (s, i) => s + i.igstAmount);
+            final totalTax = cgst + sgst + igst;
+            final cells = <pw.Widget>[
+              PdfHelpers.cell('IGST @ $slab%', cStyle, pw.TextAlign.center),
+              PdfHelpers.cell(PdfHelpers.fmt(taxable), cStyle, pw.TextAlign.right),
+            ];
+            if (isInter) {
+              cells.add(PdfHelpers.cell(PdfHelpers.fmt(igst), cStyle, pw.TextAlign.right));
+            } else {
+              cells.addAll([
+                PdfHelpers.cell(PdfHelpers.fmt(cgst), cStyle, pw.TextAlign.right),
+                PdfHelpers.cell(PdfHelpers.fmt(sgst), cStyle, pw.TextAlign.right),
+              ]);
+            }
+            cells.add(PdfHelpers.cell(PdfHelpers.fmt(totalTax), cB, pw.TextAlign.right));
+            return pw.TableRow(children: cells);
+          }),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _amountInWords(Invoice inv) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(14),
+      decoration: pw.BoxDecoration(
+        color: PdfTheme.totalBg, border: pw.Border.all(color: PdfTheme.border),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+      ),
+      child: pw.Text(PdfHelpers.toWords(inv.grandTotal),
+        style: PdfTheme.reg(10, color: PdfTheme.dark).copyWith(fontStyle: pw.FontStyle.italic)),
+    );
+  }
+
+  static pw.Widget _signatureSection() {
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.end,
+      children: [
+        pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.Container(width: 160, height: 1, color: PdfTheme.dark),
+            PdfHelpers.sp(6),
+            pw.Text('Authorised Signatory', style: PdfTheme.reg(9, color: PdfTheme.dark_07)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static pw.Widget _metaField(String label, String value) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(
+        children: [
+          pw.Text('$label: ', style: PdfTheme.reg(9, color: PdfTheme.dark_07)),
+          pw.Text(value, style: PdfTheme.med(9.5, color: PdfTheme.dark)),
+        ],
+      ),
+    );
+  }
+
+  static pw.Widget _footer() {
+    return pw.Center(
+      child: pw.Text(
+        'This is System generated slip from mebikeindia. No need of signature.',
+        style: PdfTheme.reg(7.5, color: PdfTheme.dark_05)),
+    );
+  }
+}

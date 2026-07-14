@@ -1,15 +1,56 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:printing/printing.dart';
 import '../../models/invoice_model.dart';
 import '../../pb_service.dart';
+import '../../providers/company_provider.dart';
+import '../../services/pdf/dealer_format.dart';
+import '../../services/pdf/customer_format.dart';
 import '../../theme/app_snackbars.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 
-class InvoiceDetailScreen extends StatelessWidget {
+class InvoiceDetailScreen extends ConsumerStatefulWidget {
   final Invoice invoice;
   const InvoiceDetailScreen({super.key, required this.invoice});
 
-  void _cancelInvoice(BuildContext context) async {
+  @override
+  ConsumerState<InvoiceDetailScreen> createState() => _InvoiceDetailScreenState();
+}
+
+class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
+  bool _isPdfLoading = false;
+
+  Future<void> _generatePdf() async {
+    setState(() => _isPdfLoading = true);
+    try {
+      final company = await ref.read(companyProvider.future);
+      if (company == null) {
+        if (mounted) AppSnackBars.showError(context, 'Company profile not found');
+        return;
+      }
+      Uint8List pdf;
+      if (widget.invoice.invoiceType == 'partner') {
+        pdf = await DealerInvoiceFormat.generate(widget.invoice, company);
+      } else {
+        pdf = await CustomerInvoiceFormat.generate(widget.invoice, company);
+      }
+      if (!mounted) return;
+      await Printing.sharePdf(
+        bytes: pdf,
+        filename: widget.invoice.invoiceNo.isNotEmpty
+            ? '${widget.invoice.invoiceNo.replaceAll('/', '-')}.pdf'
+            : 'invoice.pdf',
+      );
+    } catch (e) {
+      if (mounted) AppSnackBars.showError(context, 'PDF generation failed: $e');
+    } finally {
+      if (mounted) setState(() => _isPdfLoading = false);
+    }
+  }
+
+  Future<void> _cancelInvoice(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -26,7 +67,7 @@ class InvoiceDetailScreen extends StatelessWidget {
             Text('Cancel Invoice', style: AppTypography.h2.copyWith(fontSize: 18)),
             const SizedBox(height: 12),
             Text(
-              'Cancel "${invoice.invoiceNo}"?',
+              'Cancel "${widget.invoice.invoiceNo}"?',
               style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary, fontSize: 13),
               textAlign: TextAlign.center,
             ),
@@ -65,7 +106,7 @@ class InvoiceDetailScreen extends StatelessWidget {
     );
     if (confirmed != true || !context.mounted) return;
     try {
-      await PbService().pb.collection('invoice').update(invoice.id, body: {'status': 'cancelled'});
+      await PbService().pb.collection('invoice').update(widget.invoice.id, body: {'status': 'cancelled'});
       if (context.mounted) {
         AppSnackBars.showSuccess(context, 'Invoice cancelled');
         Navigator.of(context).pop();
@@ -77,11 +118,11 @@ class InvoiceDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = '${invoice.invoiceDate.day}/${invoice.invoiceDate.month}/${invoice.invoiceDate.year}';
+    final dateStr = '${widget.invoice.invoiceDate.day}/${widget.invoice.invoiceDate.month}/${widget.invoice.invoiceDate.year}';
 
     Color statusColor;
     String statusLabel;
-    switch (invoice.paymentStatus) {
+    switch (widget.invoice.paymentStatus) {
       case 'paid':
         statusColor = AppColors.success;
         statusLabel = 'Paid';
@@ -98,11 +139,22 @@ class InvoiceDetailScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(invoice.invoiceNo),
+        title: Text(widget.invoice.invoiceNo),
         elevation: 0,
         actions: [
+          if (_isPdfLoading)
+            const Padding(
+              padding: EdgeInsets.only(right: 12),
+              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf),
+              onPressed: _generatePdf,
+              tooltip: 'Download PDF',
+            ),
           Container(
-            margin: const EdgeInsets.only(right: 16),
+            margin: const EdgeInsets.only(right: 8),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: statusColor.withValues(alpha: 0.1),
@@ -128,8 +180,8 @@ class InvoiceDetailScreen extends StatelessWidget {
             const SizedBox(height: 24),
             _buildTotalsCard(),
             const SizedBox(height: 24),
-            if (invoice.notes.isNotEmpty) _buildNotes(),
-            if (invoice.status == 'confirmed') ...[
+            if (widget.invoice.notes.isNotEmpty) _buildNotes(),
+            if (widget.invoice.status == 'confirmed') ...[
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -169,36 +221,36 @@ class InvoiceDetailScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: (invoice.invoiceType == 'partner' ? AppColors.primary : const Color(0xFF0D9488)).withValues(alpha: 0.1),
+                  color: (widget.invoice.invoiceType == 'partner' ? AppColors.primary : const Color(0xFF0D9488)).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  invoice.invoiceType == 'partner' ? Icons.people_alt_rounded : Icons.person_outline_rounded,
-                  color: invoice.invoiceType == 'partner' ? AppColors.primary : const Color(0xFF0D9488),
+                  widget.invoice.invoiceType == 'partner' ? Icons.people_alt : Icons.person_outline,
+                  color: widget.invoice.invoiceType == 'partner' ? AppColors.primary : const Color(0xFF0D9488),
                   size: 18,
                 ),
               ),
               const SizedBox(width: 12),
               Text(
-                invoice.invoiceType == 'partner' ? 'Partner' : 'Customer',
+                widget.invoice.invoiceType == 'partner' ? 'Partner' : 'Customer',
                 style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted, fontSize: 11),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          Text(invoice.partyName.isNotEmpty ? invoice.partyName : 'N/A', style: AppTypography.h2),
-          if (invoice.partyMobile.isNotEmpty) ...[
+          Text(widget.invoice.partyName.isNotEmpty ? widget.invoice.partyName : 'N/A', style: AppTypography.h2),
+          if (widget.invoice.partyMobile.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(invoice.partyMobile, style: AppTypography.bodyMedium),
+            Text(widget.invoice.partyMobile, style: AppTypography.bodyMedium),
           ],
-          if (invoice.partyGst.isNotEmpty) ...[
+          if (widget.invoice.partyGst.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text('GST: ${invoice.partyGst}', style: AppTypography.bodySmall),
+            Text('GST: ${widget.invoice.partyGst}', style: AppTypography.bodySmall),
           ],
-          if (invoice.partyAddress.isNotEmpty) ...[
+          if (widget.invoice.partyAddress.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
-              invoice.partyAddress,
+              widget.invoice.partyAddress,
               style: AppTypography.bodySmall.copyWith(fontSize: 11),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -221,7 +273,7 @@ class InvoiceDetailScreen extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: _buildInfoRow(Icons.receipt_outlined, 'Invoice No', invoice.invoiceNo),
+            child: _buildInfoRow(Icons.receipt_outlined, 'Invoice No', widget.invoice.invoiceNo),
           ),
           Expanded(
             child: _buildInfoRow(Icons.calendar_today_outlined, 'Date', dateStr),
@@ -262,7 +314,7 @@ class InvoiceDetailScreen extends StatelessWidget {
         children: [
           Text('Items', style: AppTypography.h2.copyWith(fontSize: 16)),
           const SizedBox(height: 16),
-          ...invoice.items.asMap().entries.map((entry) {
+          ...widget.invoice.items.asMap().entries.map((entry) {
             final item = entry.value;
             final i = entry.key;
             return Container(
@@ -321,7 +373,7 @@ class InvoiceDetailScreen extends StatelessWidget {
   }
 
   Widget _buildTotalsCard() {
-    final isInterState = invoice.igstTotal > 0;
+    final isInterState = widget.invoice.igstTotal > 0;
 
     return Container(
       width: double.infinity,
@@ -336,18 +388,18 @@ class InvoiceDetailScreen extends StatelessWidget {
         children: [
           Text('Payment Summary', style: AppTypography.h2.copyWith(fontSize: 16)),
           const SizedBox(height: 16),
-          _buildTotalRow('Subtotal', invoice.subtotal),
-          if (invoice.discount > 0) _buildTotalRow('Discount', -invoice.discount, isNegative: true),
-          _buildTotalRow('Taxable', invoice.taxable),
+          _buildTotalRow('Subtotal', widget.invoice.subtotal),
+          if (widget.invoice.discount > 0) _buildTotalRow('Discount', -widget.invoice.discount, isNegative: true),
+          _buildTotalRow('Taxable', widget.invoice.taxable),
           if (isInterState) ...[
-            _buildTotalRow('IGST @ ${invoice.items.isNotEmpty ? invoice.items.first.igstRate.toStringAsFixed(1) : '0'}%', invoice.igstTotal),
+            _buildTotalRow('IGST @ ${widget.invoice.items.isNotEmpty ? widget.invoice.items.first.igstRate.toStringAsFixed(1) : '0'}%', widget.invoice.igstTotal),
           ] else ...[
-            _buildTotalRow('CGST', invoice.cgstTotal),
-            _buildTotalRow('SGST', invoice.sgstTotal),
+            _buildTotalRow('CGST', widget.invoice.cgstTotal),
+            _buildTotalRow('SGST', widget.invoice.sgstTotal),
           ],
-          if (invoice.roundOff != 0) _buildTotalRow('Round Off', invoice.roundOff),
+          if (widget.invoice.roundOff != 0) _buildTotalRow('Round Off', widget.invoice.roundOff),
           const Divider(height: 24, color: AppColors.border),
-          _buildTotalRow('Grand Total', invoice.grandTotal, isBold: true),
+          _buildTotalRow('Grand Total', widget.invoice.grandTotal, isBold: true),
           const SizedBox(height: 16),
           _buildPaymentInfo(),
         ],
@@ -385,13 +437,13 @@ class InvoiceDetailScreen extends StatelessWidget {
         children: [
           Icon(Icons.payments_outlined, size: 16, color: AppColors.textMuted),
           const SizedBox(width: 8),
-          Text(_paymentModeLabel(invoice.paymentMode), style: AppTypography.bodySmall.copyWith(fontSize: 11)),
+          Text(_paymentModeLabel(widget.invoice.paymentMode), style: AppTypography.bodySmall.copyWith(fontSize: 11)),
           const Spacer(),
-          if (invoice.paidAmount > 0)
-            Text('Paid: \u20B9${invoice.paidAmount.toStringAsFixed(2)}', style: TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold)),
-          if (invoice.balanceAmount > 0) ...[
+          if (widget.invoice.paidAmount > 0)
+            Text('Paid: \u20B9${widget.invoice.paidAmount.toStringAsFixed(2)}', style: TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold)),
+          if (widget.invoice.balanceAmount > 0) ...[
             const SizedBox(width: 12),
-            Text('Due: \u20B9${invoice.balanceAmount.toStringAsFixed(2)}', style: TextStyle(color: AppColors.error, fontSize: 11, fontWeight: FontWeight.bold)),
+            Text('Due: \u20B9${widget.invoice.balanceAmount.toStringAsFixed(2)}', style: TextStyle(color: AppColors.error, fontSize: 11, fontWeight: FontWeight.bold)),
           ],
         ],
       ),
@@ -429,7 +481,7 @@ class InvoiceDetailScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(invoice.notes, style: AppTypography.bodyMedium.copyWith(fontSize: 12)),
+          Text(widget.invoice.notes, style: AppTypography.bodyMedium.copyWith(fontSize: 12)),
         ],
       ),
     );
