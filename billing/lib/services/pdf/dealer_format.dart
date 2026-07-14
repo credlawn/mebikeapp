@@ -81,7 +81,7 @@ class DealerInvoiceFormat {
   static pw.Widget _header(Company c, Uint8List? logoBytes) {
     return pw.Container(
       width: double.infinity,
-      padding: const pw.EdgeInsets.fromLTRB(24, 12, 24, 12),
+      padding: const pw.EdgeInsets.fromLTRB(0, 12, 12, 12),
       decoration: pw.BoxDecoration(
         color: PdfColors.white,
         border: pw.Border(bottom: pw.BorderSide(color: PdfTheme.primary, width: 2.5)),
@@ -254,6 +254,7 @@ class DealerInvoiceFormat {
       ),
       children: [
         pw.TableRow(
+          repeat: true,
           decoration: pw.BoxDecoration(
             gradient: pw.LinearGradient(
               colors: [PdfTheme.headerBg, PdfColor.fromInt(0xFFEEF2F6)],
@@ -349,7 +350,6 @@ class DealerInvoiceFormat {
         ),
         children: [
           pw.TableRow(
-            repeat: true,
             decoration: pw.BoxDecoration(
               gradient: pw.LinearGradient(
                 colors: [PdfTheme.headerBg, PdfColor.fromInt(0xFFEEF2F6)],
