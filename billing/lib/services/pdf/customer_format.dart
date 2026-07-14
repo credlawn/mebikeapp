@@ -42,7 +42,7 @@ class CustomerInvoiceFormat {
               children: [
                 _header(company, logoBytes),
                 _metaSection(inv, company),
-                _addressSection(inv, company),
+                _addressSection(inv),
                 PdfHelpers.sp(20),
               ],
             ),
@@ -125,7 +125,7 @@ class CustomerInvoiceFormat {
                     if (c.gstNo.isNotEmpty)
                       pw.Padding(
                         padding: const pw.EdgeInsets.only(top: 2),
-                        child: pw.Text('GSTIN: ${c.gstNo}',
+                        child: pw.Text('GSTIN: ${c.gstNo}${c.stateCode.isNotEmpty ? "  |  State Code: ${c.stateCode}" : ""}',
                           style: PdfTheme.reg(8.5, color: PdfTheme.dark)),
                       ),
                   ],
@@ -183,27 +183,11 @@ class CustomerInvoiceFormat {
     );
   }
 
-  static pw.Widget _addressSection(Invoice inv, Company company) {
-    final companyAddr = [
-      company.address, company.city, company.state, company.pincode
-    ].where((e) => e.isNotEmpty).join(', ');
-
+  static pw.Widget _addressSection(Invoice inv) {
+    final extra = inv.partyStateCode.isNotEmpty ? 'State Code: ${inv.partyStateCode}' : '';
     return pw.Container(
       margin: const pw.EdgeInsets.only(top: 16),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Expanded(
-            child: _addressBox('Billed to', inv.partyName, inv.partyAddress, inv.partyGst,
-                '${inv.partyStateCode.isNotEmpty ? "State Code: ${inv.partyStateCode}" : ""}${inv.partyPincode.isNotEmpty ? "\nPincode: ${inv.partyPincode}" : ""}'),
-          ),
-          PdfHelpers.sw(20),
-          pw.Expanded(
-            child: _addressBox('Billed From', company.businessName, companyAddr, company.gstNo,
-                company.stateCode.isNotEmpty ? 'State Code: ${company.stateCode}' : ''),
-          ),
-        ],
-      ),
+      child: _addressBox('Billed to', inv.partyName, inv.partyAddress, inv.partyGst, extra),
     );
   }
 
@@ -278,8 +262,8 @@ class CustomerInvoiceFormat {
                 PdfHelpers.cell(i.hsnCode, cStyle, pw.TextAlign.center),
                 PdfHelpers.cell(i.quantity.toInt().toString(), cStyle, pw.TextAlign.center),
                 PdfHelpers.cell('Nos', cStyle, pw.TextAlign.center),
-                PdfHelpers.cell(PdfHelpers.fmt(i.unitPrice), cStyle, pw.TextAlign.right),
-                PdfHelpers.cell(PdfHelpers.fmt(i.total), cBold, pw.TextAlign.right),
+                PdfHelpers.cell(PdfHelpers.fmt(i.taxableValue / i.quantity), cStyle, pw.TextAlign.right),
+                PdfHelpers.cell(PdfHelpers.fmt(i.taxableValue), cBold, pw.TextAlign.right),
               ],
             );
           }),
@@ -293,6 +277,7 @@ class CustomerInvoiceFormat {
     final cB = PdfTheme.med(9.5, color: PdfTheme.dark);
     final gStyle = PdfTheme.sb(14, color: PdfTheme.primary);
     final totalTaxable = inv.taxable;
+    final totalGst = inv.cgstTotal + inv.sgstTotal + inv.igstTotal;
 
     return pw.Container(
       padding: const pw.EdgeInsets.all(16),
@@ -306,8 +291,7 @@ class CustomerInvoiceFormat {
           if (inv.discount > 0) _totalRow('Less: Discount', PdfHelpers.fmt(inv.discount), cStyle),
           _dashLine(),
           _totalRow('Sub Total', PdfHelpers.fmt(totalTaxable), cB),
-          for (final slab in slabs)
-            _totalRow('Add: IGST @ $slab%', PdfHelpers.fmt(bySlab[slab]!.fold(0.0, (s, i) => s + i.cgstAmount + i.sgstAmount + i.igstAmount)), cStyle),
+          _totalRow('Add: GST', PdfHelpers.fmt(totalGst), cStyle),
           _dashLine(),
           _totalRow('Grand Total', PdfHelpers.fmt(inv.grandTotal), gStyle),
         ],
@@ -367,18 +351,18 @@ class CustomerInvoiceFormat {
             final igst = items.fold(0.0, (s, i) => s + i.igstAmount);
             final totalTax = cgst + sgst + igst;
             final cells = <pw.Widget>[
-              PdfHelpers.cell('IGST @ $slab%', cStyle, pw.TextAlign.center),
-              PdfHelpers.cell(PdfHelpers.fmt(taxable), cStyle, pw.TextAlign.right),
+              PdfHelpers.cell('GST @ $slab%', cStyle, pw.TextAlign.center),
+              PdfHelpers.cell(PdfHelpers.fmt(taxable), cStyle, pw.TextAlign.center),
             ];
             if (isInter) {
-              cells.add(PdfHelpers.cell(PdfHelpers.fmt(igst), cStyle, pw.TextAlign.right));
+              cells.add(PdfHelpers.cell(PdfHelpers.fmt(igst), cStyle, pw.TextAlign.center));
             } else {
               cells.addAll([
-                PdfHelpers.cell(PdfHelpers.fmt(cgst), cStyle, pw.TextAlign.right),
-                PdfHelpers.cell(PdfHelpers.fmt(sgst), cStyle, pw.TextAlign.right),
+                PdfHelpers.cell(PdfHelpers.fmt(cgst), cStyle, pw.TextAlign.center),
+                PdfHelpers.cell(PdfHelpers.fmt(sgst), cStyle, pw.TextAlign.center),
               ]);
             }
-            cells.add(PdfHelpers.cell(PdfHelpers.fmt(totalTax), cB, pw.TextAlign.right));
+            cells.add(PdfHelpers.cell(PdfHelpers.fmt(totalTax), cB, pw.TextAlign.center));
             return pw.TableRow(children: cells);
           }),
         ],

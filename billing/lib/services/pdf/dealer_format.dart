@@ -289,6 +289,7 @@ class DealerInvoiceFormat {
     final cB = PdfTheme.med(9.5, color: PdfTheme.dark);
     final gStyle = PdfTheme.sb(14, color: PdfTheme.primary);
     final totalTaxable = inv.taxable;
+    final totalGst = inv.cgstTotal + inv.sgstTotal + inv.igstTotal;
 
     return pw.Container(
       padding: const pw.EdgeInsets.all(16),
@@ -303,8 +304,7 @@ class DealerInvoiceFormat {
           if (inv.discount > 0) _totalRow('Less: Discount', PdfHelpers.fmt(inv.discount), cStyle),
           _dashLine(),
           _totalRow('Sub Total', PdfHelpers.fmt(totalTaxable), cB),
-          for (final slab in slabs)
-            _totalRow('Add: IGST @ $slab%', PdfHelpers.fmt(bySlab[slab]!.fold(0.0, (s, i) => s + i.cgstAmount + i.sgstAmount + i.igstAmount)), cStyle),
+          _totalRow('Add: GST', PdfHelpers.fmt(totalGst), cStyle),
           _dashLine(),
           _totalRow('Grand Total', PdfHelpers.fmt(inv.grandTotal), gStyle),
         ],
@@ -367,18 +367,18 @@ class DealerInvoiceFormat {
             final igst = items.fold(0.0, (s, i) => s + i.igstAmount);
             final totalTax = cgst + sgst + igst;
             final cells = <pw.Widget>[
-              PdfHelpers.cell('IGST @ $slab%', cStyle, pw.TextAlign.center),
-              PdfHelpers.cell(PdfHelpers.fmt(taxable), cStyle, pw.TextAlign.right),
+              PdfHelpers.cell('GST @ $slab%', cStyle, pw.TextAlign.center),
+              PdfHelpers.cell(PdfHelpers.fmt(taxable), cStyle, pw.TextAlign.center),
             ];
             if (isInter) {
-              cells.add(PdfHelpers.cell(PdfHelpers.fmt(igst), cStyle, pw.TextAlign.right));
+              cells.add(PdfHelpers.cell(PdfHelpers.fmt(igst), cStyle, pw.TextAlign.center));
             } else {
               cells.addAll([
-                PdfHelpers.cell(PdfHelpers.fmt(cgst), cStyle, pw.TextAlign.right),
-                PdfHelpers.cell(PdfHelpers.fmt(sgst), cStyle, pw.TextAlign.right),
+                PdfHelpers.cell(PdfHelpers.fmt(cgst), cStyle, pw.TextAlign.center),
+                PdfHelpers.cell(PdfHelpers.fmt(sgst), cStyle, pw.TextAlign.center),
               ]);
             }
-            cells.add(PdfHelpers.cell(PdfHelpers.fmt(totalTax), cB, pw.TextAlign.right));
+            cells.add(PdfHelpers.cell(PdfHelpers.fmt(totalTax), cB, pw.TextAlign.center));
             return pw.TableRow(children: cells);
           }),
         ],
