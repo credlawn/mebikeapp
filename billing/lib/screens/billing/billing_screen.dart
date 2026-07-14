@@ -565,6 +565,12 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
     var cRemaining = colorEntries.map((c) => Map<String, dynamic>.from(c)).toList();
     var bRemaining = batteryCombos.map((b) => Map<String, dynamic>.from(b)).toList();
 
+    debugPrint('\n═══════ VEHICLE FLOW DEBUG ═══════');
+    debugPrint('fullName=$fullName  gstSlab=$gstSlab');
+    debugPrint('INIT colors: ${cRemaining.map((c) => "${c['color']}=${c['qty']}").join(", ")}');
+    var bInit = bRemaining.map((b) => "${b['batteryRecord'].getStringValue('name')}=${b['qty']}");
+    debugPrint('INIT battys: $bInit');
+
     // Pre-compute unit rates from original battery data
     final unitRateOf = <String, double>{};
     for (final b in batteryCombos) {
@@ -576,7 +582,13 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
     while (true) {
       cRemaining.removeWhere((c) => (c['qty'] as int) <= 0);
       bRemaining.removeWhere((b) => (b['qty'] as int) <= 0);
-      if (cRemaining.isEmpty || bRemaining.isEmpty) break;
+      debugPrint('\n── ITER ──');
+      debugPrint('  colors: ${cRemaining.map((c) => "${c['color']}=${c['qty']}").join(", ")}');
+      debugPrint('  battys: ${bRemaining.map((b) => "${b['batteryRecord'].getStringValue('name')}=${b['qty']}").join(", ")}');
+      if (cRemaining.isEmpty || bRemaining.isEmpty) {
+        debugPrint('  → BREAK: ${cRemaining.isEmpty ? "no colors" : "no batteries"}');
+        break;
+      }
 
       cRemaining.sort((a, b) => (b['qty'] as int).compareTo(a['qty'] as int));
       bRemaining.sort((a, b) => (b['qty'] as int).compareTo(a['qty'] as int));
@@ -585,6 +597,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       final int maxB = bRemaining.first['qty'] as int;
 
       if (maxC >= maxB) {
+        debugPrint('  → IF: fill ${cRemaining.first['color']}($maxC) with battys');
         final color = cRemaining.first;
         final colorName = color['color'] as String;
         int need = maxC;
@@ -594,10 +607,12 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
           if (battQty <= 0) continue;
           final int take = need < battQty ? need : battQty;
           final battRec = batt['batteryRecord'] as dynamic;
+          final String bDebugName = battRec.getStringValue('name');
+          debugPrint('    take $take of $bDebugName for $colorName, need=$need rem=$battQty');
           final String bFn = battRec.getStringValue('full_name');
           final String bNm = battRec.getStringValue('name');
           final String bName = bFn.isNotEmpty ? bFn : bNm;
-          final String comboName = '$fullName - $colorName + $bName';
+          final String comboName = '$fullName - $colorName + ${bName.startsWith('ME ') ? bName.substring(3) : bName}';
           final comboPrice = unitRateOf[battRec.id]!;
           final existing = _items.where((i) => i.itemName == comboName).toList();
           if (existing.any((i) => i.unitPrice == comboPrice)) {
@@ -674,6 +689,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
             );
             if (confirm != true) return;
           }
+          debugPrint('    → ADDED: $comboName x$take');
           _items.add(InvoiceItem(
             itemType: 'vehicle', itemId: vehicle.id, itemCode: code,
             itemName: comboName,
@@ -686,6 +702,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
         }
         color['qty'] = need;
       } else {
+        debugPrint('  → ELSE: fill ${bRemaining.first['batteryRecord'].getStringValue('name')}($maxB) with colors');
         final batt = bRemaining.first;
         final battRec = batt['batteryRecord'] as dynamic;
         final String bFn = battRec.getStringValue('full_name');
@@ -697,8 +714,10 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
           final int colorQty = color['qty'] as int;
           if (colorQty <= 0) continue;
           final int take = need < colorQty ? need : colorQty;
+          color['qty'] = colorQty - take;
           final colorName = color['color'] as String;
-          final String comboName = '$fullName - $colorName + $bName';
+          debugPrint('    take $take of $colorName for ${battRec.getStringValue('name')}, need=$need rem=$colorQty');
+          final String comboName = '$fullName - $colorName + ${bName.startsWith('ME ') ? bName.substring(3) : bName}';
           final comboPrice = unitRateOf[battRec.id]!;
           final existing = _items.where((i) => i.itemName == comboName).toList();
           if (existing.any((i) => i.unitPrice == comboPrice)) {
@@ -775,6 +794,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
             );
             if (confirm != true) return;
           }
+          debugPrint('    → ADDED: $comboName x$take');
           _items.add(InvoiceItem(
             itemType: 'vehicle', itemId: vehicle.id, itemCode: code,
             itemName: comboName,

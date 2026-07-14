@@ -171,6 +171,7 @@ class DealerInvoiceFormat {
               ],
             ),
           ),
+          PdfHelpers.sw(20),
           pw.Expanded(
             child: pw.Column(
               children: [
@@ -270,7 +271,7 @@ class DealerInvoiceFormat {
             decoration: idx % 2 == 0 ? pw.BoxDecoration(color: PdfTheme.evenRow) : null,
             children: [
               PdfHelpers.cell('$idx', cStyle, pw.TextAlign.center),
-              PdfHelpers.cell(i.itemName, cStyle, pw.TextAlign.left, maxLines: 2),
+              PdfHelpers.comboCell(i.itemName, cStyle),
               PdfHelpers.cell(i.hsnCode, cStyle, pw.TextAlign.center),
               PdfHelpers.cell(i.quantity.toInt().toString(), cStyle, pw.TextAlign.center),
               PdfHelpers.cell('Nos', cStyle, pw.TextAlign.center),

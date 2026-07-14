@@ -63,6 +63,24 @@ class PdfHelpers {
     );
   }
 
+  static pw.Widget comboCell(String text, pw.TextStyle style) {
+    final idx = text.indexOf('+');
+    if (idx >= 0) {
+      return pw.Container(
+        padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        child: pw.Column(
+          mainAxisSize: pw.MainAxisSize.min,
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(text.substring(0, idx).trim(), style: style, maxLines: 1),
+            pw.Text('+ ${text.substring(idx + 1).trim()}', style: style, maxLines: 1),
+          ],
+        ),
+      );
+    }
+    return cell(text, style, pw.TextAlign.left);
+  }
+
   static String fmt(double v) {
     if (v == 0) return '0.00';
     final s = v.toStringAsFixed(2);

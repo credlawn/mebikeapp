@@ -72,14 +72,15 @@ class _AddBatteryScreenState extends ConsumerState<AddBatteryScreen> {
   String _generateName(String variant) {
     final v = _voltCtrl.text.trim();
     final a = _ampCtrl.text.trim();
-    final base = v.isNotEmpty && a.isNotEmpty ? '${v}V-${a}Ah' : '';
-    final prefix = _cellType.isNotEmpty ? '$_cellType ' : '';
-    return base.isNotEmpty ? '$prefix$base' : '';
+    return v.isNotEmpty && a.isNotEmpty ? '${v}V-${a}Ah' : '';
   }
 
   String _generateFullName(String variant) {
     final n = _generateName(variant);
-    return n.isNotEmpty ? 'ME Battery - $n${variant.isNotEmpty ? " - $variant" : ""}' : 'ME Battery${variant.isNotEmpty ? " - $variant" : ""}';
+    final cell = _cellType.isNotEmpty ? ' $_cellType' : '';
+    return n.isNotEmpty
+        ? 'ME BATTERY - $n$cell${variant.isNotEmpty ? " - $variant" : ""}'
+        : 'ME BATTERY${variant.isNotEmpty ? " - $variant" : ""}';
   }
 
   Future<void> _prefillHsn() async {
