@@ -60,10 +60,10 @@ class DealerInvoiceFormat {
               children: [
                 PdfHelpers.sp(16),
                 _totalsSection(inv, sortedSlabs, itemsBySlab),
+                PdfHelpers.sp(12),
+                _amountInWords(inv),
                 PdfHelpers.sp(16),
                 _taxSummary(sortedSlabs, itemsBySlab, inv),
-                PdfHelpers.sp(16),
-                _amountInWords(inv),
                 PdfHelpers.sp(40),
                 _signatureSection(),
                 PdfHelpers.sp(20),
@@ -387,14 +387,13 @@ class DealerInvoiceFormat {
   }
 
   static pw.Widget _amountInWords(Invoice inv) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(14),
-      decoration: pw.BoxDecoration(
-        color: PdfTheme.totalBg, border: pw.Border.all(color: PdfTheme.border),
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+    return pw.RichText(
+      text: pw.TextSpan(
+        children: [
+          pw.TextSpan(text: 'Amount in words: ', style: PdfTheme.med(10, color: PdfTheme.dark).copyWith(fontStyle: pw.FontStyle.italic)),
+          pw.TextSpan(text: PdfHelpers.toWords(inv.grandTotal), style: PdfTheme.reg(10, color: PdfTheme.dark).copyWith(fontStyle: pw.FontStyle.italic)),
+        ],
       ),
-      child: pw.Text(PdfHelpers.toWords(inv.grandTotal),
-        style: PdfTheme.reg(10, color: PdfTheme.dark).copyWith(fontStyle: pw.FontStyle.italic)),
     );
   }
 

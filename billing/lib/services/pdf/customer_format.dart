@@ -60,10 +60,10 @@ class CustomerInvoiceFormat {
               children: [
                 PdfHelpers.sp(16),
                 _totalsSection(inv, sortedSlabs, itemsBySlab),
+                PdfHelpers.sp(12),
+                _amountInWords(inv),
                 PdfHelpers.sp(16),
                 _taxSummary(sortedSlabs, itemsBySlab, inv),
-                PdfHelpers.sp(16),
-                _amountInWords(inv),
                 PdfHelpers.sp(40),
                 _signatureSection(),
                 PdfHelpers.sp(20),
@@ -184,7 +184,11 @@ class CustomerInvoiceFormat {
   }
 
   static pw.Widget _addressSection(Invoice inv) {
-    final extra = inv.partyStateCode.isNotEmpty ? 'State Code: ${inv.partyStateCode}' : '';
+    String extra = inv.partyStateCode.isNotEmpty ? 'State Code: ${inv.partyStateCode}' : '';
+    if (inv.partyGst.isEmpty && inv.partyMobile.isNotEmpty) {
+      if (extra.isNotEmpty) extra += '\n';
+      extra += 'Mobile: ${inv.partyMobile}';
+    }
     return pw.Container(
       margin: const pw.EdgeInsets.only(top: 16),
       child: _addressBox('Billed to', inv.partyName, inv.partyAddress, inv.partyGst, extra),
@@ -371,14 +375,13 @@ class CustomerInvoiceFormat {
   }
 
   static pw.Widget _amountInWords(Invoice inv) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(14),
-      decoration: pw.BoxDecoration(
-        color: PdfTheme.totalBg, border: pw.Border.all(color: PdfTheme.border),
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+    return pw.RichText(
+      text: pw.TextSpan(
+        children: [
+          pw.TextSpan(text: 'Amount in words: ', style: PdfTheme.med(10, color: PdfTheme.dark).copyWith(fontStyle: pw.FontStyle.italic)),
+          pw.TextSpan(text: PdfHelpers.toWords(inv.grandTotal), style: PdfTheme.reg(10, color: PdfTheme.dark).copyWith(fontStyle: pw.FontStyle.italic)),
+        ],
       ),
-      child: pw.Text(PdfHelpers.toWords(inv.grandTotal),
-        style: PdfTheme.reg(10, color: PdfTheme.dark).copyWith(fontStyle: pw.FontStyle.italic)),
     );
   }
 
