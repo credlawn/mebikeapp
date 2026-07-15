@@ -66,7 +66,6 @@ class _ColorEntry {
 }
 
 class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
-  final _totalQtyCtrl = TextEditingController();
   final _addQtyCtrl = TextEditingController();
   final _colorSearchCtrl = TextEditingController();
   final _colorFocus = FocusNode();
@@ -84,7 +83,6 @@ class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
 
   @override
   void dispose() {
-    _totalQtyCtrl.dispose();
     _addQtyCtrl.dispose();
     _colorSearchCtrl.removeListener(_onColorSearchChanged);
     _colorSearchCtrl.dispose();
@@ -92,10 +90,8 @@ class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
     super.dispose();
   }
 
-  int get _totalQty => int.tryParse(_totalQtyCtrl.text) ?? 0;
   int get _colorSum => _selected.fold(0, (s, e) => s + e.qty);
-  int get _remaining => _totalQty - _colorSum;
-  bool get _isValid => _totalQty > 0 && _colorSum == _totalQty;
+  bool get _isValid => _colorSum > 0;
 
   List<String> get _availableColors =>
       _allColors.where((c) => !_selected.any((e) => e.name == c)).toList();
@@ -312,7 +308,7 @@ class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
     final color = _colorSearchCtrl.text.trim();
     if (color.isEmpty || !_availableColors.any((c) => c.toLowerCase() == color.toLowerCase())) return;
     final qty = int.tryParse(_addQtyCtrl.text) ?? 1;
-    if (qty <= 0 || qty > _remaining) return;
+    if (qty <= 0) return;
     final String uc = color.toUpperCase();
     final String hex = _hexFor(uc);
     setState(() {
@@ -335,7 +331,7 @@ class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
     }).toList();
     Navigator.of(context).pop({
       'vehicle': widget.vehicleRecord,
-      'totalQty': _totalQty,
+      'totalQty': _colorSum,
       'colorEntries': colors,
     });
   }
@@ -357,51 +353,17 @@ class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: _totalQtyCtrl,
-              decoration: InputDecoration(
-                labelText: 'Total Quantity',
-                labelStyle: AppTypography.bodySmall,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                filled: true,
-                fillColor: AppColors.background,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              ),
-              style: AppTypography.input,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              onChanged: (_) => setState(() {}),
-            ),
-            if (_totalQty > 0) ...[
-              const SizedBox(height: 24),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Add Color', style: AppTypography.h3),
-                      if (_totalQty > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: _remaining > 0
-                                ? Colors.orange.withValues(alpha: 0.08)
-                                : AppColors.success.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            _remaining > 0 ? '$_remaining Remaining' : 'Done',
-                            style: AppTypography.bodySmall.copyWith(
-                              fontSize: 12,
-                              color: _remaining > 0 ? Colors.orange : AppColors.success,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+            const SizedBox(height: 24),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Add Color', style: AppTypography.h3),
+                  ],
                 ),
-              ],
-                  ),
-                  const SizedBox(height: 12),
+                const SizedBox(height: 12),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -505,7 +467,6 @@ class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
                         child: ElevatedButton(
                           onPressed: _colorSearchCtrl.text.trim().isNotEmpty &&
                               _availableColors.any((c) => c.toLowerCase() == _colorSearchCtrl.text.trim().toLowerCase()) &&
-                              _remaining > 0 &&
                               (int.tryParse(_addQtyCtrl.text) ?? 0) > 0
                               ? _addColor
                               : null,
@@ -523,7 +484,6 @@ class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
                   ),
                 ],
               ),
-            ],
             const SizedBox(height: 20),
 
             if (_selected.isNotEmpty) ...[
@@ -532,11 +492,9 @@ class _VehicleQtyColorScreenState extends State<VehicleQtyColorScreen> {
                 children: [
                   Text('Colors', style: AppTypography.h3),
                   Text(
-                    '$_colorSum / $_totalQty',
+                    '$_colorSum',
                     style: AppTypography.h3.copyWith(
-                      color: _totalQty > 0
-                          ? (_colorSum == _totalQty ? AppColors.success : AppColors.warning)
-                          : AppColors.textMuted,
+                      color: _colorSum > 0 ? AppColors.success : AppColors.textMuted,
                     ),
                   ),
                 ],

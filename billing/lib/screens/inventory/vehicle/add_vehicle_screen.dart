@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/inventory/vehicle_model.dart';
-import '../../../models/inventory/color_item_model.dart';
 import '../../../providers/inventory/inventory_provider.dart';
 import '../../../theme/colors.dart';
 import '../../../theme/typography.dart';
@@ -22,11 +21,8 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
   final _sellingPriceCtrl = TextEditingController();
   final _hsnCtrl = TextEditingController();
   String _vehicleType = '';
-  final _selectedColorIds = <String>{};
   int _gstSlab = -1;
   bool _isLoading = false;
-  bool _isAddingColor = false;
-  final _newColorCtrl = TextEditingController();
 
   static const _gstOptions = [0, 5, 12, 18, 28];
   static const _vehicleOptions = ['BIKE', 'SCOOTER'];
@@ -42,9 +38,6 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
       _hsnCtrl.text = e.hsnCode;
       _vehicleType = e.vehicleType;
       _gstSlab = e.gstSlab;
-      if (e.color.isNotEmpty) {
-        _selectedColorIds.addAll(e.color.split(',').map((c) => c.trim()));
-      }
     } else {
       _prefillHsn();
     }
@@ -58,13 +51,13 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
     _variantCtrl.dispose();
     _sellingPriceCtrl.dispose();
     _hsnCtrl.dispose();
-    _newColorCtrl.dispose();
     super.dispose();
   }
 
   String _generateFullName(String variant) {
     final n = _nameCtrl.text.trim().toUpperCase();
-    final vt = _vehicleType.isNotEmpty ? ' - $_vehicleType' : '';
+    final typeShort = _vehicleType == 'SCOOTER' ? 'SCT' : _vehicleType;
+    final vt = typeShort.isNotEmpty ? ' - $typeShort' : '';
     final v = variant.isNotEmpty ? ' - $variant' : '';
     return 'ME $n$vt$v';
   }
@@ -78,35 +71,10 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
     } catch (_) {}
   }
 
-  Future<void> _addColorToCollection() async {
-    final name = _newColorCtrl.text.trim().toUpperCase();
-    if (name.isEmpty) return;
-    try {
-      final existing = await ref.read(inventoryRepositoryProvider).getAllColors();
-      final isDuplicate = existing.any((c) => c.name.toUpperCase() == name);
-      if (isDuplicate) {
-        if (mounted) AppSnackBars.showError(context, 'Color "$name" already exists');
-        return;
-      }
-      await ref.read(inventoryRepositoryProvider).createColor({'name': name, 'status': 'active'});
-      ref.invalidate(allColorsProvider);
-      _newColorCtrl.clear();
-      _selectedColorIds.add(name);
-      setState(() => _isAddingColor = false);
-      if (mounted) AppSnackBars.showSuccess(context, 'Color added');
-    } catch (_) {
-      if (mounted) AppSnackBars.showError(context, 'Cannot reach server');
-    }
-  }
-
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_vehicleType.isEmpty) {
       if (mounted) AppSnackBars.showError(context, 'Please select a vehicle type');
-      return;
-    }
-    if (_selectedColorIds.isEmpty) {
-      if (mounted) AppSnackBars.showError(context, 'Please select at least one color');
       return;
     }
     if (_gstSlab < 0) {
@@ -135,7 +103,6 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
         'name': _nameCtrl.text.trim().toUpperCase(),
         'full_name': fullName,
         'vehicle_type': _vehicleType.isEmpty ? null : _vehicleType,
-        'color': _selectedColorIds.join(','),
         'selling_price': double.tryParse(_sellingPriceCtrl.text.trim()) ?? 0,
         'gst_slab': _gstSlab,
         'hsn_code': _hsnCtrl.text.trim().isEmpty ? null : _hsnCtrl.text.trim(),
@@ -172,7 +139,6 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = ref.watch(allColorsProvider).value ?? <ColorItem>[];
     final autoFullName = _generateFullName(_variantCtrl.text.trim().toUpperCase());
 
     return Scaffold(
@@ -233,7 +199,7 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
               const SizedBox(height: 20),
               _buildField('Variant (Leave blank if no variant)', _variantCtrl, Icons.tune_outlined, null, textCapitalization: TextCapitalization.characters),
               const SizedBox(height: 20),
-              _buildField('Selling Price (₹) *', _sellingPriceCtrl, Icons.currency_rupee_rounded, 'Required', keyboardType: TextInputType.number),
+              _buildField('Selling Price (₹)', _sellingPriceCtrl, Icons.currency_rupee_rounded, null, keyboardType: TextInputType.number),
               const SizedBox(height: 24),
               Text('Vehicle Type *', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
               const SizedBox(height: 8),
@@ -257,89 +223,6 @@ class _AddVehicleScreenState extends ConsumerState<AddVehicleScreen> {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 20),
-              Text('Colors *', style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6, runSpacing: 6,
-                children: [
-                  ...colors.map((c) {
-                    final selected = _selectedColorIds.contains(c.name);
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          if (selected) {
-                            _selectedColorIds.remove(c.name);
-                          } else {
-                            _selectedColorIds.add(c.name);
-                          }
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: selected ? AppColors.primary : AppColors.background,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 1.5 : 1),
-                        ),
-                        child: Text(c.name, style: AppTypography.bodySmall.copyWith(
-                          color: selected ? Colors.white : AppColors.textSecondary,
-                          fontWeight: selected ? FontWeight.bold : FontWeight.normal)),
-                      ),
-                    );
-                  }),
-                  if (!_isAddingColor)
-                    GestureDetector(
-                      onTap: () => setState(() => _isAddingColor = true),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: const Icon(Icons.add_rounded, size: 16, color: AppColors.primary),
-                      ),
-                    ),
-                ],
-              ),
-              if (_isAddingColor)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Row(
-                    children: [
-                      Expanded(child: SizedBox(
-                        height: 40,
-                        child: TextField(
-                          controller: _newColorCtrl,
-                          textCapitalization: TextCapitalization.characters,
-                          decoration: InputDecoration(
-                            hintText: 'Color name', hintStyle: AppTypography.bodySmall.copyWith(color: AppColors.textMuted),
-                            filled: true, fillColor: AppColors.background,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          ),
-                          style: AppTypography.input,
-                        ),
-                      )),
-                      const SizedBox(width: 8),
-                      SizedBox(height: 40, child: ElevatedButton(
-                        onPressed: _addColorToCollection,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary, foregroundColor: Colors.white, elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text('Add', style: TextStyle(fontWeight: FontWeight.bold)),
-                      )),
-                      const SizedBox(width: 8),
-                      SizedBox(height: 40, child: OutlinedButton(
-                        onPressed: () => setState(() { _isAddingColor = false; _newColorCtrl.clear(); }),
-                        style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                        child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.bold)),
-                      )),
-                    ],
-                  ),
-                ),
               if (autoFullName.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 8, left: 4),
