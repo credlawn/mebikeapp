@@ -35,7 +35,6 @@ class BillingScreen extends ConsumerStatefulWidget {
 class _BillingScreenState extends ConsumerState<BillingScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
-  final String _invoiceNo = '';
 
   late String _invoiceType;
   String _customerId = '';
@@ -51,8 +50,8 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
 
   final List<InvoiceItem> _items = [];
 
-  String _paymentMode = 'cash';
-  String _paymentStatus = 'paid';
+  final String _paymentMode = 'cash';
+  final String _paymentStatus = 'paid';
   final _paidAmountCtrl = TextEditingController();
 
   @override
@@ -814,10 +813,10 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
 
       final repo = ref.read(invoiceRepositoryProvider);
       String invoiceNo = '';
-      if (isFinal) {
-        invoiceNo = widget.mode == 'quotation'
-            ? await repo.getNextQuotationNo()
-            : await repo.getNextInvoiceNo();
+      if (widget.mode == 'quotation') {
+        invoiceNo = await repo.getNextQuotationNo();
+      } else if (isFinal) {
+        invoiceNo = await repo.getNextInvoiceNo();
       }
 
       final body = {
@@ -908,7 +907,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('New Invoice'),
+        title: Text(widget.mode == 'quotation' ? 'New Quotation' : 'New Invoice'),
         elevation: 0,
         actions: [
           TextButton(
@@ -926,25 +925,6 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Invoice No
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.receipt_long_outlined, size: 18, color: AppColors.primary),
-                    const SizedBox(width: 10),
-                    Text(
-                      _invoiceNo.isNotEmpty ? '${widget.mode == 'quotation' ? "Quote" : "Invoice"} No: $_invoiceNo' : 'New ${widget.mode == 'quotation' ? "Quotation" : "Invoice"}',
-                      style: AppTypography.h3.copyWith(color: AppColors.primary),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
 
               // Type + Tax indicator
               Row(
@@ -1004,9 +984,9 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               Container(height: 1, color: AppColors.border),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
               // Party Section
               _buildPartyCard(),
@@ -1066,50 +1046,6 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
               const SizedBox(height: 24),
               Container(height: 1, color: AppColors.border),
               const SizedBox(height: 24),
-
-              // Payment
-              _buildSectionHeader('Payment'),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildPickerField(
-                      'Mode',
-                      _paymentMode,
-                      Icons.payment_outlined,
-                      ['cash', 'card', 'upi', 'credit'],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildPickerField(
-                      'Status',
-                      _paymentStatus,
-                      Icons.check_circle_outline,
-                      ['paid', 'unpaid', 'partial'],
-                    ),
-                  ),
-                ],
-              ),
-              if (_paymentStatus != 'paid') ...[
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _paidAmountCtrl,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
-                  style: AppTypography.input,
-                  decoration: InputDecoration(
-                    labelText: 'Paid Amount',
-                    labelStyle: AppTypography.bodySmall,
-                    prefixIcon: const Icon(Icons.currency_rupee_rounded, size: 18, color: AppColors.textSecondary),
-                    filled: true,
-                    fillColor: AppColors.background,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -1260,62 +1196,6 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPickerField(String label, String value, IconData icon, List<String> options) {
-    return InkWell(
-      onTap: () async {
-        final result = await showDialog<String>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: Colors.white,
-            surfaceTintColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(label, style: AppTypography.h2),
-                const SizedBox(height: 16),
-                ...options.map((o) => ListTile(
-                  title: Text(o[0].toUpperCase() + o.substring(1), style: AppTypography.bodyLarge),
-                  trailing: value == o ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
-                  onTap: () => Navigator.of(ctx).pop(o),
-                )),
-              ],
-            ),
-          ),
-        );
-        if (result != null && mounted) {
-          setState(() {
-            if (label == 'Mode') _paymentMode = result;
-            if (label == 'Status') _paymentStatus = result;
-          });
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: AppColors.textSecondary),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted)),
-                const SizedBox(height: 2),
-                Text(value[0].toUpperCase() + value.substring(1), style: AppTypography.bodyMedium),
-              ],
-            ),
-            const Spacer(),
-            const Icon(Icons.expand_more_rounded, size: 20, color: AppColors.textMuted),
-          ],
-        ),
       ),
     );
   }

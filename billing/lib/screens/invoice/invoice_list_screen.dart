@@ -192,6 +192,19 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
     );
   }
 
+  Future<void> _convertToInvoice(Invoice quotation) async {
+    try {
+      final repo = ref.read(invoiceRepositoryProvider);
+      final inv = await repo.duplicateAsInvoice(quotation);
+      ref.invalidate(allInvoicesProvider(widget.mode));
+      if (!mounted) return;
+      AppSnackBars.showSuccess(context, 'Converted to Invoice (Draft)');
+      Navigator.push(context, MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoice: inv)));
+    } catch (_) {
+      if (mounted) AppSnackBars.showError(context, 'Conversion failed');
+    }
+  }
+
   void _showInvoiceActions(Invoice inv) {
     final no = inv.invoiceNo.isNotEmpty ? inv.invoiceNo : 'Draft';
     showModalBottomSheet(
@@ -219,7 +232,7 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
               if (inv.status == 'confirmed' && !inv.locked) ...[
                 ListTile(
                   leading: const Icon(Icons.cancel_outlined, color: Colors.orange),
-                  title: Text(_isQuotation ? 'Cancel Quotation' : 'Cancel Invoice', style: AppTypography.bodyLarge),
+                  title: Text('Cancel ${_isQuotation ? "Quotation" : "Invoice"}', style: AppTypography.bodyLarge),
                   onTap: () { Navigator.of(ctx).pop(); _cancelInvoice(inv); },
                 ),
                 ListTile(
@@ -235,9 +248,27 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
                 ),
               if (inv.status == 'draft')
                 ListTile(
+                  leading: const Icon(Icons.edit_outlined, color: AppColors.primary),
+                  title: Text('Edit', style: AppTypography.bodyLarge),
+                  onTap: () { Navigator.of(ctx).pop(); AppSnackBars.showInfo(context, 'Edit coming soon'); },
+                ),
+              if (inv.status == 'draft')
+                ListTile(
                   leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
                   title: Text('Delete ${_isQuotation ? "Draft Quotation" : "Draft"}', style: AppTypography.bodyLarge),
                   onTap: () { Navigator.of(ctx).pop(); _confirmDelete(inv.id, no); },
+                ),
+              if (inv.status == 'sent')
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined, color: AppColors.primary),
+                  title: Text('Edit', style: AppTypography.bodyLarge),
+                  onTap: () { Navigator.of(ctx).pop(); AppSnackBars.showInfo(context, 'Edit coming soon'); },
+                ),
+              if (inv.status == 'sent')
+                ListTile(
+                  leading: const Icon(Icons.receipt_long_outlined, color: Color(0xFF0D9488)),
+                  title: Text('Convert to Invoice', style: AppTypography.bodyLarge),
+                  onTap: () { Navigator.of(ctx).pop(); _convertToInvoice(inv); },
                 ),
               if (inv.status == 'cancelled')
                 ListTile(
@@ -270,7 +301,7 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
             if (!_isQuotation) const Tab(text: 'Unpaid'),
             if (!_isQuotation) const Tab(text: 'Paid'),
             if (_isQuotation) const Tab(text: 'Draft'),
-            if (_isQuotation) const Tab(text: 'Confirmed'),
+            if (_isQuotation) const Tab(text: 'Sent'),
           ],
         ),
       ),
@@ -290,13 +321,13 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
           if (_isQuotation) {
             final all = invoices;
             final draft = invoices.where((i) => i.status == 'draft').toList();
-            final confirmed = invoices.where((i) => i.status == 'confirmed').toList();
+            final sent = invoices.where((i) => i.status == 'sent').toList();
             return IndexedStack(
               index: _tabController.index,
               children: [
                 _buildTab(all),
                 _buildTab(draft),
-                _buildTab(confirmed),
+                _buildTab(sent),
               ],
             );
           }
@@ -356,6 +387,10 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
           Color statusColor;
           String statusLabel;
           switch (inv.status) {
+            case 'sent':
+              statusColor = const Color(0xFF2563EB);
+              statusLabel = 'Sent';
+              break;
             case 'confirmed':
               statusColor = AppColors.success;
               statusLabel = 'Confirmed';

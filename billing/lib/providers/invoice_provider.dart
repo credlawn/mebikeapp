@@ -93,6 +93,20 @@ class InvoiceRepository {
   Future<void> deleteInvoice(String id) async {
     await _pbService.pb.collection('invoice').delete(id);
   }
+
+  Future<void> updateInvoiceStatus(String id, String status) async {
+    await _pbService.pb.collection('invoice').update(id, body: {'status': status});
+  }
+
+  Future<Invoice> duplicateAsInvoice(Invoice quotation) async {
+    final body = quotation.toJson();
+    body.remove('id');
+    body['mode'] = 'invoice';
+    body['status'] = 'draft';
+    body['invoice_no'] = '';
+    body['locked'] = false;
+    return createInvoice(body);
+  }
 }
 
 final invoiceRepositoryProvider = Provider((ref) => InvoiceRepository());

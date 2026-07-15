@@ -5,6 +5,7 @@ import 'package:printing/printing.dart';
 import '../../models/invoice_model.dart';
 import '../../pb_service.dart';
 import '../../providers/company_provider.dart';
+import '../../providers/invoice_provider.dart';
 import '../../services/pdf/dealer_format.dart';
 import '../../services/pdf/customer_format.dart';
 import '../../theme/app_snackbars.dart';
@@ -45,6 +46,12 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
             ? '${widget.invoice.invoiceNo.replaceAll('/', '-')}.pdf'
             : '${widget.invoice.mode == 'quotation' ? 'quotation' : 'invoice'}.pdf',
       );
+      if (widget.invoice.mode == 'quotation' && widget.invoice.status == 'draft' && mounted) {
+        final repo = ref.read(invoiceRepositoryProvider);
+        await repo.updateInvoiceStatus(widget.invoice.id, 'sent');
+        ref.invalidate(allInvoicesProvider(widget.invoice.mode));
+        if (mounted) AppSnackBars.showSuccess(context, 'Quotation marked as Sent');
+      }
     } catch (e) {
       if (mounted) AppSnackBars.showError(context, 'PDF generation failed: $e');
     } finally {
@@ -122,6 +129,40 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     }
   }
 
+  Future<void> _convertToInvoice(BuildContext context) async {
+    try {
+      final repo = ref.read(invoiceRepositoryProvider);
+      final inv = await repo.duplicateAsInvoice(widget.invoice);
+      ref.invalidate(allInvoicesProvider(widget.invoice.mode));
+      if (!context.mounted) return;
+      AppSnackBars.showSuccess(context, 'Converted to Invoice (Draft)');
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoice: inv)));
+    } catch (_) {
+      if (!context.mounted) return;
+      AppSnackBars.showError(context, 'Conversion failed');
+    }
+  }
+
+  Future<void> _finalizeDraft(BuildContext context) async {
+    try {
+      final repo = ref.read(invoiceRepositoryProvider);
+      final no = await repo.getNextInvoiceNo();
+      final updated = await repo.updateInvoice(widget.invoice.id, {'invoice_no': no, 'status': 'confirmed'});
+      ref.invalidate(allInvoicesProvider(widget.invoice.mode));
+      if (!context.mounted) return;
+      AppSnackBars.showSuccess(context, 'Invoice created');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => InvoiceDetailScreen(invoice: updated),
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      AppSnackBars.showError(context, 'Failed to finalize');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateStr = '${widget.invoice.invoiceDate.day}/${widget.invoice.invoiceDate.month}/${widget.invoice.invoiceDate.year}';
@@ -162,7 +203,77 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                 _buildTotalsCard(),
                 const SizedBox(height: 16),
                 if (widget.invoice.notes.isNotEmpty) _buildNotes(),
-                if (widget.invoice.status == 'confirmed') ...[
+                if (widget.invoice.status == 'draft') ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => AppSnackBars.showInfo(context, 'Edit coming soon'),
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Edit'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                  if (widget.invoice.mode != 'quotation') ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _finalizeDraft(context),
+                        icon: const Icon(Icons.check_circle_outlined, size: 18),
+                        label: const Text('Create Invoice'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.success,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+                if (widget.invoice.mode == 'quotation' && widget.invoice.status == 'sent') ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => AppSnackBars.showInfo(context, 'Edit coming soon'),
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Edit Quotation'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _convertToInvoice(context),
+                      icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                      label: const Text('Convert to Invoice'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D9488),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ],
+                if (widget.invoice.mode != 'quotation' && widget.invoice.status == 'confirmed') ...[
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
@@ -265,7 +376,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                       children: [
                         Icon(Icons.receipt_outlined, size: 12, color: AppColors.textMuted),
                         const SizedBox(width: 4),
-                        Text('Invoice No', style: AppTypography.bodySmall.copyWith(fontSize: 9, color: AppColors.textMuted)),
+                        Text(widget.invoice.mode == 'quotation' ? 'Quotation No' : 'Invoice No', style: AppTypography.bodySmall.copyWith(fontSize: 9, color: AppColors.textMuted)),
                       ],
                     ),
                     const SizedBox(height: 4),
