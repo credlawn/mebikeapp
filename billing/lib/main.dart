@@ -126,7 +126,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         '/company-profile': (context) => const CompanyScreen(),
         '/customer-list': (context) => const CustomerListScreen(),
         '/add-customer': (context) => const AddCustomerScreen(),
-        '/billing-list': (context) => const InvoiceListScreen(),
+        '/billing-list': (context) => const InvoiceListScreen(mode: 'invoice'),
+        '/quotation-list': (context) => const InvoiceListScreen(mode: 'quotation'),
       },
     );
   }

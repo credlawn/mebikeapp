@@ -5,14 +5,16 @@ import 'customer_search_screen.dart';
 import 'partner_search_screen.dart';
 
 class InvoiceTypeScreen extends StatelessWidget {
-  const InvoiceTypeScreen({super.key});
+  final String mode;
+  const InvoiceTypeScreen({super.key, this.mode = 'invoice'});
 
   @override
   Widget build(BuildContext context) {
+    final isQuotation = mode == 'quotation';
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('New Invoice'),
+        title: Text(isQuotation ? 'New Quotation' : 'New Invoice'),
         elevation: 0,
       ),
       body: Padding(
@@ -21,7 +23,7 @@ class InvoiceTypeScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 8),
-            Text('Select Invoice Type', style: AppTypography.h1),
+            Text(isQuotation ? 'Select Quotation Type' : 'Select Invoice Type', style: AppTypography.h1),
             const SizedBox(height: 8),
             Text(
               'Choose who you are billing',
@@ -36,7 +38,7 @@ class InvoiceTypeScreen extends StatelessWidget {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const CustomerSearchScreen(),
+                  builder: (_) => CustomerSearchScreen(mode: mode),
                 ),
               ),
             ),
@@ -49,7 +51,7 @@ class InvoiceTypeScreen extends StatelessWidget {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const PartnerSearchScreen(),
+                  builder: (_) => PartnerSearchScreen(mode: mode),
                 ),
               ),
             ),

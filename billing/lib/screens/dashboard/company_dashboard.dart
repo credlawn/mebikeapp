@@ -125,6 +125,13 @@ class _CompanyDashboardState extends ConsumerState<CompanyDashboard> with Single
                     color: Colors.orange,
                     onTap: () => Navigator.pushNamed(context, '/billing-list'),
                   ),
+                  ModuleCard(
+                    title: 'Quotations',
+                    subtitle: 'Quotes & Estimates',
+                    icon: Icons.request_quote_outlined,
+                    color: Colors.indigo,
+                    onTap: () => Navigator.pushNamed(context, '/quotation-list'),
+                  ),
                   const ModuleCard(
                     title: 'Reports',
                     subtitle: 'Analytics',

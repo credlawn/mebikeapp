@@ -16,11 +16,13 @@ import 'battery_combo_screen.dart';
 import '../invoice/invoice_detail_screen.dart';
 
 class BillingScreen extends ConsumerStatefulWidget {
+  final String mode;
   final String invoiceType;
   final Customer? customer;
   final Partner? partner;
   const BillingScreen({
     super.key,
+    this.mode = 'invoice',
     required this.invoiceType,
     this.customer,
     this.partner,
@@ -813,10 +815,13 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       final repo = ref.read(invoiceRepositoryProvider);
       String invoiceNo = '';
       if (isFinal) {
-        invoiceNo = await repo.getNextInvoiceNo();
+        invoiceNo = widget.mode == 'quotation'
+            ? await repo.getNextQuotationNo()
+            : await repo.getNextInvoiceNo();
       }
 
       final body = {
+        'mode': widget.mode,
         'invoice_no': invoiceNo,
         'invoice_type': _invoiceType,
         'invoice_date': DateTime.now().toIso8601String(),
@@ -850,11 +855,11 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       };
 
       final inv = await repo.createInvoice(body);
-      ref.invalidate(allInvoicesProvider);
+      ref.invalidate(allInvoicesProvider(widget.mode));
       if (!mounted) return;
 
       if (isFinal) {
-        AppSnackBars.showSuccess(context, 'Invoice Created: $invoiceNo');
+        AppSnackBars.showSuccess(context, '${widget.mode == 'quotation' ? "Quotation" : "Invoice"} Created: $invoiceNo');
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => InvoiceDetailScreen(invoice: inv),
@@ -933,7 +938,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
                     const Icon(Icons.receipt_long_outlined, size: 18, color: AppColors.primary),
                     const SizedBox(width: 10),
                     Text(
-                      _invoiceNo.isNotEmpty ? 'Invoice No: $_invoiceNo' : 'New Invoice',
+                      _invoiceNo.isNotEmpty ? '${widget.mode == 'quotation' ? "Quote" : "Invoice"} No: $_invoiceNo' : 'New ${widget.mode == 'quotation' ? "Quotation" : "Invoice"}',
                       style: AppTypography.h3.copyWith(color: AppColors.primary),
                     ),
                   ],
@@ -1118,7 +1123,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
                   ),
                   child: _isSaving
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Text('Create Invoice', style: AppTypography.button.copyWith(color: Colors.white, fontSize: 15)),
+                      : Text(widget.mode == 'quotation' ? 'Create Quotation' : 'Create Invoice', style: AppTypography.button.copyWith(color: Colors.white, fontSize: 15)),
                 ),
               ),
               const SizedBox(height: 24),

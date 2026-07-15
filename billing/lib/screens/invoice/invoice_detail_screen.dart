@@ -31,7 +31,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         return;
       }
       Uint8List pdf;
-      if (widget.invoice.invoiceType == 'partner') {
+      if (widget.invoice.mode == 'quotation') {
+        pdf = await CustomerInvoiceFormat.generate(widget.invoice, company);
+      } else if (widget.invoice.invoiceType == 'partner') {
         pdf = await DealerInvoiceFormat.generate(widget.invoice, company);
       } else {
         pdf = await CustomerInvoiceFormat.generate(widget.invoice, company);
@@ -41,7 +43,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         bytes: pdf,
         filename: widget.invoice.invoiceNo.isNotEmpty
             ? '${widget.invoice.invoiceNo.replaceAll('/', '-')}.pdf'
-            : 'invoice.pdf',
+            : '${widget.invoice.mode == 'quotation' ? 'quotation' : 'invoice'}.pdf',
       );
     } catch (e) {
       if (mounted) AppSnackBars.showError(context, 'PDF generation failed: $e');
@@ -67,7 +69,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
               child: const Icon(Icons.cancel_outlined, color: Colors.orange, size: 28),
             ),
             const SizedBox(height: 20),
-            Text('Cancel Invoice', style: AppTypography.h2.copyWith(fontSize: 18)),
+            Text(widget.invoice.mode == 'quotation' ? 'Cancel Quotation' : 'Cancel Invoice', style: AppTypography.h2.copyWith(fontSize: 18)),
             const SizedBox(height: 12),
             Text(
               'Cancel "${widget.invoice.invoiceNo}"?',
@@ -100,7 +102,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: Text('Cancel Invoice', style: AppTypography.button.copyWith(color: Colors.white)),
+                  child: Text(widget.invoice.mode == 'quotation' ? 'Cancel Quotation' : 'Cancel Invoice', style: AppTypography.button.copyWith(color: Colors.white)),
                 ),
               ),
             ],
@@ -112,7 +114,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     try {
       await PbService().pb.collection('invoice').update(widget.invoice.id, body: {'status': 'cancelled'});
       if (context.mounted) {
-        AppSnackBars.showSuccess(context, 'Invoice cancelled');
+        AppSnackBars.showSuccess(context, widget.invoice.mode == 'quotation' ? 'Quotation cancelled' : 'Invoice cancelled');
         Navigator.of(context).pop();
       }
     } catch (_) {
@@ -127,7 +129,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(widget.invoice.invoiceNo),
+        title: Text(widget.invoice.mode == 'quotation' ? 'Quotation' : widget.invoice.invoiceNo),
         elevation: 0,
         actions: [
           if (_isPdfLoading)
@@ -167,7 +169,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                     child: OutlinedButton.icon(
                       onPressed: () => _cancelInvoice(context),
                       icon: const Icon(Icons.cancel_outlined, size: 18),
-                      label: const Text('Cancel Invoice'),
+                      label: Text(widget.invoice.mode == 'quotation' ? 'Cancel Quotation' : 'Cancel Invoice'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.orange,
                         side: const BorderSide(color: Colors.orange),

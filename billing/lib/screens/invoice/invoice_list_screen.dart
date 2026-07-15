@@ -10,7 +10,8 @@ import '../billing/invoice_type_screen.dart';
 import 'invoice_detail_screen.dart';
 
 class InvoiceListScreen extends ConsumerStatefulWidget {
-  const InvoiceListScreen({super.key});
+  final String mode;
+  const InvoiceListScreen({super.key, this.mode = 'invoice'});
 
   @override
   ConsumerState<InvoiceListScreen> createState() => _InvoiceListScreenState();
@@ -19,6 +20,7 @@ class InvoiceListScreen extends ConsumerStatefulWidget {
 class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool get _isQuotation => widget.mode == 'quotation';
 
   @override
   void initState() {
@@ -37,7 +39,7 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
 
   Future<void> _handleRefresh() async {
     try {
-      await ref.refresh(allInvoicesProvider.future).timeout(
+      await ref.refresh(allInvoicesProvider(widget.mode).future).timeout(
         const Duration(seconds: 5),
         onTimeout: () => throw 'Server timeout. Try again later.',
       );
@@ -50,8 +52,8 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
   Future<void> _deleteInvoice(String id, String no) async {
     try {
       await PbService().pb.collection('invoice').delete(id);
-      ref.invalidate(allInvoicesProvider);
-      if (mounted) AppSnackBars.showSuccess(context, 'Invoice $no deleted');
+      ref.invalidate(allInvoicesProvider(widget.mode));
+      if (mounted) AppSnackBars.showSuccess(context, '${_isQuotation ? "Quotation" : "Invoice"} $no deleted');
     } catch (_) {
       if (mounted) AppSnackBars.showError(context, 'Delete failed');
     }
@@ -74,7 +76,7 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
               child: const Icon(Icons.cancel_outlined, color: Colors.orange, size: 28),
             ),
             const SizedBox(height: 20),
-            Text('Cancel Invoice', style: AppTypography.h2.copyWith(fontSize: 18)),
+            Text(_isQuotation ? "Cancel Quotation" : "Cancel Invoice", style: AppTypography.h2.copyWith(fontSize: 18)),
             const SizedBox(height: 12),
             Text(
               'Cancel "${inv.invoiceNo.isNotEmpty ? inv.invoiceNo : 'Draft'}"?',
@@ -107,19 +109,19 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: Text('Cancel Invoice', style: AppTypography.button.copyWith(color: Colors.white)),
+                  child: Text(_isQuotation ? 'Cancel Quotation' : 'Cancel Invoice', style: AppTypography.button.copyWith(color: Colors.white)),
                 ),
               ),
-            ],
-          ),
-        ],
-      ),
-    );
+              ],
+            ),
+          ],
+        ),
+      );
     if (confirmed != true) return;
     try {
       await PbService().pb.collection('invoice').update(inv.id, body: {'status': 'cancelled'});
-      ref.invalidate(allInvoicesProvider);
-      if (mounted) AppSnackBars.showSuccess(context, 'Invoice cancelled');
+      ref.invalidate(allInvoicesProvider(widget.mode));
+      if (mounted) AppSnackBars.showSuccess(context, _isQuotation ? 'Quotation cancelled' : 'Invoice cancelled');
     } catch (_) {
       if (mounted) AppSnackBars.showError(context, 'Failed to cancel');
     }
@@ -142,7 +144,7 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
               child: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 28),
             ),
             const SizedBox(height: 20),
-            Text('Delete Invoice', style: AppTypography.h2),
+            Text('Delete ${_isQuotation ? "Quotation" : "Invoice"}', style: AppTypography.h2),
             const SizedBox(height: 12),
             Text(
               'Delete "$invoiceNo"? This cannot be undone.',
@@ -217,12 +219,12 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
               if (inv.status == 'confirmed' && !inv.locked) ...[
                 ListTile(
                   leading: const Icon(Icons.cancel_outlined, color: Colors.orange),
-                  title: Text('Cancel Invoice', style: AppTypography.bodyLarge),
+                  title: Text(_isQuotation ? 'Cancel Quotation' : 'Cancel Invoice', style: AppTypography.bodyLarge),
                   onTap: () { Navigator.of(ctx).pop(); _cancelInvoice(inv); },
                 ),
                 ListTile(
                   leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
-                  title: Text('Delete Invoice', style: AppTypography.bodyLarge),
+                  title: Text('Delete ${_isQuotation ? "Quotation" : "Invoice"}', style: AppTypography.bodyLarge),
                   onTap: () { Navigator.of(ctx).pop(); _confirmDelete(inv.id, no); },
                 ),
               ],
@@ -234,7 +236,7 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
               if (inv.status == 'draft')
                 ListTile(
                   leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
-                  title: Text('Delete Draft', style: AppTypography.bodyLarge),
+                  title: Text('Delete ${_isQuotation ? "Draft Quotation" : "Draft"}', style: AppTypography.bodyLarge),
                   onTap: () { Navigator.of(ctx).pop(); _confirmDelete(inv.id, no); },
                 ),
               if (inv.status == 'cancelled')
@@ -251,27 +253,29 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
 
   @override
   Widget build(BuildContext context) {
-    final invoicesAsync = ref.watch(allInvoicesProvider);
+    final invoicesAsync = ref.watch(allInvoicesProvider(widget.mode));
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Invoices'),
+        title: Text(_isQuotation ? 'Quotations' : 'Invoices'),
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.primary,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textMuted,
-          tabs: const [
-            Tab(text: 'All'),
-            Tab(text: 'Unpaid'),
-            Tab(text: 'Paid'),
+          tabs: [
+            const Tab(text: 'All'),
+            if (!_isQuotation) const Tab(text: 'Unpaid'),
+            if (!_isQuotation) const Tab(text: 'Paid'),
+            if (_isQuotation) const Tab(text: 'Draft'),
+            if (_isQuotation) const Tab(text: 'Confirmed'),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvoiceTypeScreen())),
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => InvoiceTypeScreen(mode: widget.mode))),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -283,10 +287,22 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
           child: Text('Cannot reach server', style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted)),
         ),
         data: (invoices) {
+          if (_isQuotation) {
+            final all = invoices;
+            final draft = invoices.where((i) => i.status == 'draft').toList();
+            final confirmed = invoices.where((i) => i.status == 'confirmed').toList();
+            return IndexedStack(
+              index: _tabController.index,
+              children: [
+                _buildTab(all),
+                _buildTab(draft),
+                _buildTab(confirmed),
+              ],
+            );
+          }
           final all = invoices;
           final unpaid = invoices.where((i) => i.paymentStatus == 'unpaid' || i.paymentStatus == 'partial').toList();
           final paid = invoices.where((i) => i.paymentStatus == 'paid').toList();
-
           return IndexedStack(
             index: _tabController.index,
             children: [
@@ -314,9 +330,9 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.receipt_long_outlined, size: 48, color: AppColors.textMuted.withValues(alpha: 0.4)),
+                  Icon(_isQuotation ? Icons.request_quote_outlined : Icons.receipt_long_outlined, size: 48, color: AppColors.textMuted.withValues(alpha: 0.4)),
                   const SizedBox(height: 12),
-                  Text('No invoices found', style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted)),
+                  Text(_isQuotation ? 'No quotations found' : 'No invoices found', style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted)),
                 ],
               ),
             ),
@@ -389,7 +405,7 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Center(
-                        child: Icon(Icons.receipt_outlined, size: 16, color: typeColor),
+                        child: Icon(_isQuotation ? Icons.request_quote_outlined : Icons.receipt_outlined, size: 16, color: typeColor),
                       ),
                     ),
                     const SizedBox(width: 12),

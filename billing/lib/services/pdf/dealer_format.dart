@@ -40,7 +40,7 @@ class DealerInvoiceFormat {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                _header(company, logoBytes),
+                _header(inv, company, logoBytes),
                 _metaSection(inv),
                 _addressSection(inv, company),
                 PdfHelpers.sp(20),
@@ -67,7 +67,7 @@ class DealerInvoiceFormat {
                 PdfHelpers.sp(40),
                 _signatureSection(),
                 PdfHelpers.sp(20),
-                _footer(),
+                _footer(inv),
               ],
             ),
           ),
@@ -78,7 +78,7 @@ class DealerInvoiceFormat {
     return doc.save();
   }
 
-  static pw.Widget _header(Company c, Uint8List? logoBytes) {
+  static pw.Widget _header(Invoice inv, Company c, Uint8List? logoBytes) {
     return pw.Container(
       width: double.infinity,
       padding: const pw.EdgeInsets.fromLTRB(0, 12, 12, 12),
@@ -93,7 +93,7 @@ class DealerInvoiceFormat {
             children: [
               if (logoBytes != null) pw.SizedBox(width: 60),
               pw.Expanded(
-                child: pw.Text('TAX INVOICE',
+                child: pw.Text(inv.mode == 'quotation' ? 'QUOTATION' : 'TAX INVOICE',
                   textAlign: pw.TextAlign.center,
                   style: PdfTheme.sb(16, color: PdfTheme.primary).copyWith(letterSpacing: 1)),
               ),
@@ -425,10 +425,10 @@ class DealerInvoiceFormat {
     );
   }
 
-  static pw.Widget _footer() {
+  static pw.Widget _footer(Invoice inv) {
     return pw.Center(
       child: pw.Text(
-        'This is System generated slip from mebikeindia. No need of signature.',
+        inv.mode == 'quotation' ? 'This is a System generated quotation from mebikeindia.' : 'This is System generated slip from mebikeindia. No need of signature.',
         style: PdfTheme.reg(7.5, color: PdfTheme.dark_05)),
     );
   }

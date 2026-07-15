@@ -5,10 +5,11 @@ import '../pb_service.dart';
 class InvoiceRepository {
   final PbService _pbService = PbService();
 
-  Future<List<Invoice>> getAllInvoices() async {
+  Future<List<Invoice>> getAllInvoices({String mode = 'invoice'}) async {
     try {
       final records = await _pbService.pb.collection('invoice').getFullList(
         sort: '-created',
+        filter: 'mode = "$mode"',
       );
       return records.map((r) => Invoice.fromJson(r.toJson())).toList();
     } catch (e) {
@@ -23,15 +24,35 @@ class InvoiceRepository {
         page: 1,
         perPage: 1,
         sort: '-created',
-        filter: 'invoice_no ~ "MANNS/$fy/%"',
+        filter: 'invoice_no ~ "MANNS/$fy/%" && mode = "invoice"',
       );
       if (records.items.isEmpty) {
         return 'MANNS/$fy/0001';
       }
       final lastNo = records.items.first.getStringValue('invoice_no');
-      return _generateInvoiceNo(lastNo);
+      return _generateNextNo(lastNo, 'MANNS/$fy/');
     } catch (e) {
       return 'MANNS/$fy/0001';
+    }
+  }
+
+  Future<String> getNextQuotationNo() async {
+    final fy = _currentFy(null);
+    final prefix = 'ME/Q/$fy/';
+    try {
+      final records = await _pbService.pb.collection('invoice').getList(
+        page: 1,
+        perPage: 1,
+        sort: '-created',
+        filter: 'invoice_no ~ "ME/Q/$fy/%" && mode = "quotation"',
+      );
+      if (records.items.isEmpty) {
+        return '${prefix}0001';
+      }
+      final lastNo = records.items.first.getStringValue('invoice_no');
+      return _generateNextNo(lastNo, prefix);
+    } catch (e) {
+      return '${prefix}0001';
     }
   }
 
@@ -50,14 +71,10 @@ class InvoiceRepository {
     }
   }
 
-  String _generateInvoiceNo(String lastNo) {
-    final fy = _currentFy(null);
-    final prefix = 'MANNS/$fy/';
-
+  String _generateNextNo(String lastNo, String prefix) {
     if (!lastNo.startsWith(prefix)) {
       return '${prefix}0001';
     }
-
     final numStr = lastNo.substring(prefix.length);
     final num = int.tryParse(numStr) ?? 0;
     return '$prefix${(num + 1).toString().padLeft(4, '0')}';
@@ -80,8 +97,8 @@ class InvoiceRepository {
 
 final invoiceRepositoryProvider = Provider((ref) => InvoiceRepository());
 
-final allInvoicesProvider = FutureProvider<List<Invoice>>((ref) async {
+final allInvoicesProvider = FutureProvider.family<List<Invoice>, String>((ref, mode) async {
   ref.keepAlive();
   final repo = ref.watch(invoiceRepositoryProvider);
-  return repo.getAllInvoices();
+  return repo.getAllInvoices(mode: mode);
 });

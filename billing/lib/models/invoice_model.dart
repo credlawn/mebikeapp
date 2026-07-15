@@ -90,6 +90,7 @@ class Invoice {
   final String id;
   final String collectionId;
   final String collectionName;
+  final String mode;
   final String invoiceNo;
   final String invoiceType;
   final DateTime invoiceDate;
@@ -130,6 +131,7 @@ class Invoice {
     required this.id,
     required this.collectionId,
     required this.collectionName,
+    this.mode = 'invoice',
     required this.invoiceNo,
     required this.invoiceType,
     required this.invoiceDate,
@@ -185,6 +187,7 @@ class Invoice {
       id: json['id'] ?? '',
       collectionId: json['collectionId'] ?? '',
       collectionName: json['collectionName'] ?? '',
+      mode: json['mode'] ?? 'invoice',
       invoiceNo: json['invoice_no'] ?? '',
       invoiceType: json['invoice_type'] ?? '',
       invoiceDate: json['invoice_date'] != null
@@ -228,6 +231,7 @@ class Invoice {
   }
 
   Map<String, dynamic> toJson() => {
+    'mode': mode,
     'invoice_no': invoiceNo,
     'invoice_type': invoiceType,
     'invoice_date': invoiceDate.toIso8601String(),

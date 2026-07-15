@@ -7,7 +7,8 @@ import '../customer/add_customer_screen.dart';
 import 'billing_screen.dart';
 
 class CustomerSearchScreen extends ConsumerStatefulWidget {
-  const CustomerSearchScreen({super.key});
+  final String mode;
+  const CustomerSearchScreen({super.key, this.mode = 'invoice'});
 
   @override
   ConsumerState<CustomerSearchScreen> createState() => _CustomerSearchScreenState();
@@ -51,6 +52,7 @@ class _CustomerSearchScreenState extends ConsumerState<CustomerSearchScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => BillingScreen(
+          mode: widget.mode,
           invoiceType: 'customer',
           customer: c,
         ),

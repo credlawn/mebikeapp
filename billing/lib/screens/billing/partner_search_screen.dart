@@ -7,7 +7,8 @@ import '../../theme/app_snackbars.dart';
 import 'billing_screen.dart';
 
 class PartnerSearchScreen extends ConsumerStatefulWidget {
-  const PartnerSearchScreen({super.key});
+  final String mode;
+  const PartnerSearchScreen({super.key, this.mode = 'invoice'});
 
   @override
   ConsumerState<PartnerSearchScreen> createState() => _PartnerSearchScreenState();
@@ -55,6 +56,7 @@ class _PartnerSearchScreenState extends ConsumerState<PartnerSearchScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => BillingScreen(
+          mode: widget.mode,
           invoiceType: 'partner',
           partner: p,
         ),
