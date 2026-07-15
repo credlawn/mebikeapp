@@ -54,6 +54,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -80,11 +83,12 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                 child: OutlinedButton(
                   onPressed: () => Navigator.of(ctx).pop(false),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary, width: 1.2),
+                    foregroundColor: AppColors.textMuted,
+                    side: BorderSide(color: AppColors.textMuted.withValues(alpha: 0.4)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: Text('No', style: AppTypography.button.copyWith(color: AppColors.primary)),
+                  child: Text('No', style: AppTypography.button.copyWith(color: AppColors.textMuted)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -96,7 +100,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: const Text('Cancel Invoice'),
+                  child: Text('Cancel Invoice', style: AppTypography.button.copyWith(color: Colors.white)),
                 ),
               ),
             ],
@@ -120,22 +124,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
   Widget build(BuildContext context) {
     final dateStr = '${widget.invoice.invoiceDate.day}/${widget.invoice.invoiceDate.month}/${widget.invoice.invoiceDate.year}';
 
-    Color statusColor;
-    String statusLabel;
-    switch (widget.invoice.paymentStatus) {
-      case 'paid':
-        statusColor = AppColors.success;
-        statusLabel = 'Paid';
-        break;
-      case 'partial':
-        statusColor = Colors.orange;
-        statusLabel = 'Partial';
-        break;
-      default:
-        statusColor = AppColors.error;
-        statusLabel = 'Unpaid';
-    }
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -148,69 +136,83 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
               child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
             )
           else
-            IconButton(
-              icon: const Icon(Icons.picture_as_pdf),
-              onPressed: _generatePdf,
-              tooltip: 'Download PDF',
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                icon: const Icon(Icons.picture_as_pdf, color: AppColors.primary),
+                onPressed: _generatePdf,
+                tooltip: 'Download PDF',
+              ),
             ),
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              statusLabel,
-              style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-          ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildPartyCard(),
-            const SizedBox(height: 24),
-            _buildInvoiceInfo(dateStr),
-            const SizedBox(height: 24),
-            _buildItemsTable(),
-            const SizedBox(height: 24),
-            _buildTotalsCard(),
-            const SizedBox(height: 24),
-            if (widget.invoice.notes.isNotEmpty) _buildNotes(),
-            if (widget.invoice.status == 'confirmed') ...[
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _cancelInvoice(context),
-                  icon: const Icon(Icons.cancel_outlined, size: 18),
-                  label: const Text('Cancel Invoice'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.orange,
-                    side: const BorderSide(color: Colors.orange),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildPartyCard(dateStr),
+                const SizedBox(height: 16),
+                _buildItemsTable(),
+                const SizedBox(height: 16),
+                _buildTotalsCard(),
+                const SizedBox(height: 16),
+                if (widget.invoice.notes.isNotEmpty) _buildNotes(),
+                if (widget.invoice.status == 'confirmed') ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _cancelInvoice(context),
+                      icon: const Icon(Icons.cancel_outlined, size: 18),
+                      label: const Text('Cancel Invoice'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.orange,
+                        side: const BorderSide(color: Colors.orange),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (widget.invoice.status == 'cancelled')
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: Transform.rotate(
+                    angle: -0.45,
+                    child: Text(
+                      'CANCELLED',
+                      style: TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.error.withValues(alpha: 0.15),
+                        letterSpacing: 8,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ],
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildPartyCard() {
+  Widget _buildPartyCard(String dateStr) {
+    final typeColor = widget.invoice.invoiceType == 'partner' ? AppColors.primary : const Color(0xFF0D9488);
+    final typeLabel = widget.invoice.invoiceType == 'partner' ? 'Partner' : 'Customer';
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -218,34 +220,26 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: (widget.invoice.invoiceType == 'partner' ? AppColors.primary : const Color(0xFF0D9488)).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  widget.invoice.invoiceType == 'partner' ? Icons.people_alt : Icons.person_outline,
-                  color: widget.invoice.invoiceType == 'partner' ? AppColors.primary : const Color(0xFF0D9488),
-                  size: 18,
-                ),
+              Expanded(
+                child: Text(widget.invoice.partyName.isNotEmpty ? widget.invoice.partyName : 'N/A', style: AppTypography.h3.copyWith(fontSize: 15, fontWeight: FontWeight.w600)),
               ),
-              const SizedBox(width: 12),
-              Text(
-                widget.invoice.invoiceType == 'partner' ? 'Partner' : 'Customer',
-                style: AppTypography.bodySmall.copyWith(color: AppColors.textMuted, fontSize: 11),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: typeColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(typeLabel, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: typeColor)),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(widget.invoice.partyName.isNotEmpty ? widget.invoice.partyName : 'N/A', style: AppTypography.h2),
           if (widget.invoice.partyMobile.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(widget.invoice.partyMobile, style: AppTypography.bodyMedium),
+            Text(widget.invoice.partyMobile, style: AppTypography.bodySmall.copyWith(fontSize: 13)),
           ],
           if (widget.invoice.partyGst.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text('GST: ${widget.invoice.partyGst}', style: AppTypography.bodySmall),
+            Text('GST: ${widget.invoice.partyGst}', style: AppTypography.bodySmall.copyWith(fontSize: 11)),
           ],
           if (widget.invoice.partyAddress.isNotEmpty) ...[
             const SizedBox(height: 4),
@@ -256,115 +250,111 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ],
+          const SizedBox(height: 12),
+          Container(height: 1, color: AppColors.border),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.receipt_outlined, size: 12, color: AppColors.textMuted),
+                        const SizedBox(width: 4),
+                        Text('Invoice No', style: AppTypography.bodySmall.copyWith(fontSize: 9, color: AppColors.textMuted)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(widget.invoice.invoiceNo, style: AppTypography.h3.copyWith(fontSize: 13)),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.textMuted),
+                        const SizedBox(width: 4),
+                        Text('Date', style: AppTypography.bodySmall.copyWith(fontSize: 9, color: AppColors.textMuted)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(dateStr, style: AppTypography.h3.copyWith(fontSize: 13)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildInvoiceInfo(String dateStr) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildInfoRow(Icons.receipt_outlined, 'Invoice No', widget.invoice.invoiceNo),
-          ),
-          Expanded(
-            child: _buildInfoRow(Icons.calendar_today_outlined, 'Date', dateStr),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 14, color: AppColors.textMuted),
-            const SizedBox(width: 6),
-            Text(label, style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted)),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(value, style: AppTypography.h3.copyWith(fontSize: 14)),
-      ],
     );
   }
 
   Widget _buildItemsTable() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Items', style: AppTypography.h2.copyWith(fontSize: 16)),
-          const SizedBox(height: 16),
+          Text('Items', style: AppTypography.h2.copyWith(fontSize: 15)),
+          const SizedBox(height: 12),
           ...widget.invoice.items.asMap().entries.map((entry) {
             final item = entry.value;
             final i = entry.key;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Center(
-                          child: Text('${i + 1}', style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
-                        ),
+            return Column(
+              children: [
+                if (i > 0) Container(height: 1, color: AppColors.border),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(width: 22, child: Text('${i + 1}.', style: AppTypography.bodySmall.copyWith(fontSize: 10, color: AppColors.textMuted))),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(item.itemName, style: AppTypography.h3.copyWith(fontSize: 12)),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 16),
+                                child: Text('\u20B9 ${item.total == item.total.roundToDouble() ? item.total.toStringAsFixed(0) : item.total.toStringAsFixed(2)}', style: AppTypography.h3.copyWith(fontSize: 12)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              if (item.gstSlab > 0)
+                                Text('GST ${item.gstSlab}%', style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
+                              if (item.gstSlab > 0 && item.discountPercent > 0) const SizedBox(width: 10),
+                              if (item.discountPercent > 0) ...[
+                                Text('${item.discountPercent}% off', style: TextStyle(color: Colors.orange, fontSize: 10)),
+                                const SizedBox(width: 10),
+                              ],
+                              const Spacer(),
+                              Text('${item.quantity.toInt()} x \u20B9${item.unitPrice == item.unitPrice.roundToDouble() ? item.unitPrice.toStringAsFixed(0) : item.unitPrice.toStringAsFixed(2)}', style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
+                            ],
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(item.itemName, style: AppTypography.h3.copyWith(fontSize: 13))),
-                      Text('\u20B9 ${item.total.toStringAsFixed(2)}', style: AppTypography.h3.copyWith(fontSize: 13)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text('${item.quantity} x \u20B9${item.unitPrice.toStringAsFixed(2)}', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
-                      if (item.discountPercent > 0) ...[
-                        const SizedBox(width: 12),
-                        Text('${item.discountPercent}% off', style: TextStyle(color: Colors.orange, fontSize: 11)),
-                      ],
-                      const Spacer(),
-                      if (item.gstSlab > 0)
-                        Text('GST ${item.gstSlab}%', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
-                    ],
-                  ),
-                  if (item.hsnCode.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text('HSN: ${item.hsnCode}', style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
+                    ),
                   ],
-                ],
-              ),
+                ),
+                const SizedBox(height: 8),
+              ],
             );
           }),
         ],
@@ -377,17 +367,17 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Payment Summary', style: AppTypography.h2.copyWith(fontSize: 16)),
-          const SizedBox(height: 16),
+          Text('Payment Summary', style: AppTypography.h2.copyWith(fontSize: 14)),
+          const SizedBox(height: 12),
           _buildTotalRow('Subtotal', widget.invoice.subtotal),
           if (widget.invoice.discount > 0) _buildTotalRow('Discount', -widget.invoice.discount, isNegative: true),
           _buildTotalRow('Taxable', widget.invoice.taxable),
@@ -398,9 +388,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
             _buildTotalRow('SGST', widget.invoice.sgstTotal),
           ],
           if (widget.invoice.roundOff != 0) _buildTotalRow('Round Off', widget.invoice.roundOff),
-          const Divider(height: 24, color: AppColors.border),
+          const Divider(height: 16, color: AppColors.border),
           _buildTotalRow('Grand Total', widget.invoice.grandTotal, isBold: true),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           _buildPaymentInfo(),
         ],
       ),
@@ -409,14 +399,14 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
 
   Widget _buildTotalRow(String label, double amount, {bool isBold = false, bool isNegative = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: isBold ? AppTypography.h3.copyWith(fontSize: 13) : AppTypography.bodySmall.copyWith(fontSize: 12))),
+          Expanded(child: Text(label, style: isBold ? AppTypography.h3.copyWith(fontSize: 13) : AppTypography.bodySmall.copyWith(fontSize: 11))),
           Text(
             '${isNegative ? '- ' : ''}\u20B9 ${amount.abs().toStringAsFixed(2)}',
             style: (isBold ? AppTypography.h3 : AppTypography.bodyMedium).copyWith(
-              fontSize: isBold ? 15 : 12,
+              fontSize: isBold ? 14 : 12,
               fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
             ),
           ),
@@ -427,23 +417,23 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
 
   Widget _buildPaymentInfo() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
-          Icon(Icons.payments_outlined, size: 16, color: AppColors.textMuted),
-          const SizedBox(width: 8),
-          Text(_paymentModeLabel(widget.invoice.paymentMode), style: AppTypography.bodySmall.copyWith(fontSize: 11)),
+          Icon(Icons.payments_outlined, size: 14, color: AppColors.textMuted),
+          const SizedBox(width: 6),
+          Text(_paymentModeLabel(widget.invoice.paymentMode), style: AppTypography.bodySmall.copyWith(fontSize: 10)),
           const Spacer(),
           if (widget.invoice.paidAmount > 0)
-            Text('Paid: \u20B9${widget.invoice.paidAmount.toStringAsFixed(2)}', style: TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold)),
+            Text('Paid: \u20B9${widget.invoice.paidAmount.toStringAsFixed(2)}', style: TextStyle(color: AppColors.success, fontSize: 10, fontWeight: FontWeight.bold)),
           if (widget.invoice.balanceAmount > 0) ...[
-            const SizedBox(width: 12),
-            Text('Due: \u20B9${widget.invoice.balanceAmount.toStringAsFixed(2)}', style: TextStyle(color: AppColors.error, fontSize: 11, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 8),
+            Text('Due: \u20B9${widget.invoice.balanceAmount.toStringAsFixed(2)}', style: TextStyle(color: AppColors.error, fontSize: 10, fontWeight: FontWeight.bold)),
           ],
         ],
       ),
@@ -464,10 +454,10 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
   Widget _buildNotes() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -475,12 +465,12 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.notes_rounded, size: 16, color: AppColors.textMuted),
-              const SizedBox(width: 8),
-              Text('Notes', style: AppTypography.h2.copyWith(fontSize: 14)),
+              Icon(Icons.notes_rounded, size: 14, color: AppColors.textMuted),
+              const SizedBox(width: 6),
+              Text('Notes', style: AppTypography.h2.copyWith(fontSize: 13)),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Text(widget.invoice.notes, style: AppTypography.bodyMedium.copyWith(fontSize: 12)),
         ],
       ),

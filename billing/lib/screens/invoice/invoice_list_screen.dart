@@ -61,6 +61,9 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -87,11 +90,12 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
                 child: OutlinedButton(
                   onPressed: () => Navigator.of(ctx).pop(false),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary, width: 1.2),
+                    foregroundColor: AppColors.textMuted,
+                    side: BorderSide(color: AppColors.textMuted.withValues(alpha: 0.4)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: Text('No', style: AppTypography.button.copyWith(color: AppColors.primary)),
+                  child: Text('No', style: AppTypography.button.copyWith(color: AppColors.textMuted)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -103,7 +107,7 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: const Text('Cancel Invoice'),
+                  child: Text('Cancel Invoice', style: AppTypography.button.copyWith(color: Colors.white)),
                 ),
               ),
             ],
@@ -125,6 +129,9 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -348,106 +355,91 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
 
           final typeColor = inv.invoiceType == 'partner' ? AppColors.primary : const Color(0xFF0D9488);
           final typeLabel = inv.invoiceType == 'partner' ? 'Partner' : 'Customer';
+          final subtitle = [
+            if (inv.partyName.isNotEmpty) inv.partyName else inv.partyMobile,
+            dateStr,
+            typeLabel,
+            if (inv.status == 'confirmed') '\u20B9${inv.grandTotal.toStringAsFixed(2)}',
+          ].join(' | ');
 
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: AppColors.border),
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
             ),
             child: InkWell(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => InvoiceDetailScreen(invoice: inv)),
               ),
               onLongPress: () => _showInvoiceActions(inv),
               child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: typeColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Center(
-                            child: Text(
-                              inv.invoiceNo.isNotEmpty
-                                  ? (inv.invoiceNo.length > 6
-                                      ? inv.invoiceNo.substring(inv.invoiceNo.length - 4)
-                                      : inv.invoiceNo)
-                                  : 'DR',
-                              style: AppTypography.bodyMedium.copyWith(
-                                color: typeColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: typeColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Icon(Icons.receipt_outlined, size: 16, color: typeColor),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Text(
-                                inv.invoiceNo.isNotEmpty ? inv.invoiceNo : 'Draft',
-                                style: AppTypography.h3.copyWith(fontSize: 14)),
-                              const SizedBox(height: 2),
-                              Text(
-                                inv.partyName.isNotEmpty ? inv.partyName : inv.partyMobile,
-                                style: AppTypography.bodySmall.copyWith(fontSize: 11),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              Expanded(
+                                child: Text(
+                                  inv.invoiceNo.isNotEmpty ? inv.invoiceNo : 'Draft',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF111827),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  statusLabel,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: statusColor,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            statusLabel,
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle,
                             style: TextStyle(
-                              color: statusColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                              height: 1.3,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Icon(Icons.calendar_today_outlined, size: 11, color: AppColors.textMuted),
-                        const SizedBox(width: 4),
-                        Text(dateStr, style: TextStyle(color: AppColors.textMuted, fontSize: 10)),
-                        const SizedBox(width: 16),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: typeColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(typeLabel, style: TextStyle(color: typeColor, fontSize: 9, fontWeight: FontWeight.bold)),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '\u20B9 ${inv.grandTotal.toStringAsFixed(2)}',
-                          style: AppTypography.h3.copyWith(fontSize: 14, color: AppColors.textPrimary),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
