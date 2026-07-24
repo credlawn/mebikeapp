@@ -395,6 +395,10 @@ class _InvoiceListScreenState extends ConsumerState<InvoiceListScreen>
               statusColor = AppColors.success;
               statusLabel = 'Confirmed';
               break;
+            case 'billed':
+              statusColor = const Color(0xFF7C3AED);
+              statusLabel = 'Billed';
+              break;
             case 'cancelled':
               statusColor = AppColors.error;
               statusLabel = 'Cancelled';

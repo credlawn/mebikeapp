@@ -92,6 +92,7 @@ class Invoice {
   final String collectionName;
   final String mode;
   final String invoiceNo;
+  final String quotationNo;
   final String invoiceType;
   final DateTime invoiceDate;
   final DateTime? dueDate;
@@ -133,6 +134,7 @@ class Invoice {
     required this.collectionName,
     this.mode = 'invoice',
     required this.invoiceNo,
+    this.quotationNo = '',
     required this.invoiceType,
     required this.invoiceDate,
     this.dueDate,
@@ -189,6 +191,7 @@ class Invoice {
       collectionName: json['collectionName'] ?? '',
       mode: json['mode'] ?? 'invoice',
       invoiceNo: json['invoice_no'] ?? '',
+      quotationNo: json['quotation_no'] ?? '',
       invoiceType: json['invoice_type'] ?? '',
       invoiceDate: json['invoice_date'] != null
           ? DateTime.parse(json['invoice_date'].toString())
@@ -233,6 +236,7 @@ class Invoice {
   Map<String, dynamic> toJson() => {
     'mode': mode,
     'invoice_no': invoiceNo,
+    'quotation_no': quotationNo,
     'invoice_type': invoiceType,
     'invoice_date': invoiceDate.toIso8601String(),
     'due_date': dueDate?.toIso8601String() ?? '',

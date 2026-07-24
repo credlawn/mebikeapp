@@ -1,15 +1,37 @@
 #!/bin/bash
 
+# ─────────────────────────────────────────────────────────────
+#  mebike backend — dev/build script
+#
+#  USAGE:
+#    ./run          → local dev server (automigrate ON)
+#    ./run build    → Linux production binary (upload to server)
+# ─────────────────────────────────────────────────────────────
+
 COMMAND=${1:-run}
 
 if [ "$COMMAND" = "run" ]; then
-    echo "Starting PocketBase dev server on http://0.0.0.0:8090..."
+    echo "🚀 Starting local dev server on http://localhost:8090"
+    echo "💡 Admin UI: http://localhost:8090/_/"
+    echo "💡 Collections mein jo bhi change karo → migrations/ folder mein"
+    echo "   auto .go file banega → binary mein compile hogi"
+    echo ""
     go run . serve --http="0.0.0.0:8090"
+
 elif [ "$COMMAND" = "build" ] || [ "$COMMAND" = "p" ]; then
-    echo "Building Linux production binary..."
+    echo "🔨 Building Linux production binary..."
     GOOS=linux GOARCH=amd64 go build -o mebikeapp
-    echo "Done! Saved as: mebikeapp"
+    echo ""
+    echo "✅ Done! Binary saved as: mebikeapp"
+    ls -lh mebikeapp
+    echo ""
+    echo "📤 Ab server par upload karo:"
+    echo "   scp mebikeapp user@server:/path/to/mebikeapp"
+
 else
-    echo "Usage: ./app {run|p}"
+    echo "Usage: ./run {run|build}"
+    echo ""
+    echo "  run    → local dev server"
+    echo "  build  → Linux production binary"
     exit 1
 fi

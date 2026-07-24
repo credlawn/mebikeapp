@@ -50,10 +50,6 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
 
   final List<InvoiceItem> _items = [];
 
-  final String _paymentMode = 'cash';
-  final String _paymentStatus = 'paid';
-  final _paidAmountCtrl = TextEditingController();
-
   @override
   void initState() {
     super.initState();
@@ -808,9 +804,6 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
 
     setState(() => _isSaving = true);
     try {
-      final paidAmount = double.tryParse(_paidAmountCtrl.text) ?? _grandTotal;
-      final balance = _grandTotal - paidAmount;
-
       final repo = ref.read(invoiceRepositoryProvider);
       String invoiceNo = '';
       if (widget.mode == 'quotation') {
@@ -822,6 +815,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       final body = {
         'mode': widget.mode,
         'invoice_no': invoiceNo,
+        'quotation_no': '',
         'invoice_type': _invoiceType,
         'invoice_date': DateTime.now().toIso8601String(),
         'partner_id': _invoiceType == 'partner' ? widget.partner?.id : null,
@@ -845,10 +839,6 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
         'sgst_total': _sgstTotal,
         'igst_total': _igstTotal,
         'grand_total': _grandTotal,
-        'payment_mode': _paymentMode,
-        'payment_status': _paymentStatus,
-        'paid_amount': paidAmount,
-        'balance_amount': balance < 0 ? 0 : balance,
         'status': isFinal ? 'confirmed' : 'draft',
         'notes': '',
       };
@@ -894,12 +884,6 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       case 'charger': return Colors.teal;
       default: return Colors.grey;
     }
-  }
-
-  @override
-  void dispose() {
-    _paidAmountCtrl.dispose();
-    super.dispose();
   }
 
   @override

@@ -87,13 +87,25 @@ class PdfHelpers {
     final parts = s.split('.');
     final intPart = parts[0];
     final decPart = parts[1];
+    if (intPart.length <= 3) return '$intPart.$decPart';
     final buf = StringBuffer();
     int count = 0;
+    bool firstGroup = true;
     for (int i = intPart.length - 1; i >= 0; i--) {
-      count++;
       buf.write(intPart[i]);
-      if (count == 3 && i > 0) { buf.write(','); count = 0; }
-      else if (count == 2 && i > 0) { buf.write(','); count = 0; }
+      count++;
+      if (firstGroup) {
+        if (count == 3 && i > 0) {
+          buf.write(',');
+          count = 0;
+          firstGroup = false;
+        }
+      } else {
+        if (count == 2 && i > 0) {
+          buf.write(',');
+          count = 0;
+        }
+      }
     }
     return '${buf.toString().split('').reversed.join()}.$decPart';
   }

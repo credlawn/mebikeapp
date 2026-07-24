@@ -17,6 +17,21 @@ func RegisterInvoiceHooks(app *pocketbase.PocketBase) {
 	})
 
 	app.OnRecordUpdate("invoice").BindFunc(func(e *core.RecordEvent) error {
+		if e.Record.GetString("status") == "confirmed" {
+			if qNo := e.Record.GetString("quotation_no"); qNo != "" {
+				quotes, _ := app.FindRecordsByFilter(
+					"invoice",
+					"invoice_no = {:qNo} && mode = 'quotation'",
+					"", 1, 0,
+					map[string]any{"qNo": qNo},
+				)
+				if len(quotes) > 0 {
+					quotes[0].Set("status", "billed")
+					app.Save(quotes[0])
+				}
+			}
+		}
+
 		old, _ := e.App.FindRecordById("invoice", e.Record.Id)
 		if old == nil || old.GetString("invoice_no") != "" {
 			return e.Next()
@@ -34,7 +49,7 @@ func RegisterInvoiceHooks(app *pocketbase.PocketBase) {
 func lockAllConfirmedExcept(app core.App, excludeId string) error {
 	records, err := app.FindRecordsByFilter(
 		"invoice",
-		"invoice_no != '' && locked = false && id != {:id}",
+		"invoice_no != '' && locked = false && mode = 'invoice' && id != {:id}",
 		"", -1, 0,
 		map[string]any{"id": excludeId},
 	)

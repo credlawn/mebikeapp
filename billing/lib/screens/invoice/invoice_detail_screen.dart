@@ -495,7 +495,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
           if (widget.invoice.discount > 0) _buildTotalRow('Discount', -widget.invoice.discount, isNegative: true),
           _buildTotalRow('Taxable', widget.invoice.taxable),
           if (isInterState) ...[
-            _buildTotalRow('IGST @ ${widget.invoice.items.isNotEmpty ? widget.invoice.items.first.igstRate.toStringAsFixed(1) : '0'}%', widget.invoice.igstTotal),
+            _buildTotalRow('IGST', widget.invoice.igstTotal),
           ] else ...[
             _buildTotalRow('CGST', widget.invoice.cgstTotal),
             _buildTotalRow('SGST', widget.invoice.sgstTotal),
@@ -503,8 +503,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
           if (widget.invoice.roundOff != 0) _buildTotalRow('Round Off', widget.invoice.roundOff),
           const Divider(height: 16, color: AppColors.border),
           _buildTotalRow('Grand Total', widget.invoice.grandTotal, isBold: true),
-          const SizedBox(height: 12),
-          _buildPaymentInfo(),
         ],
       ),
     );
@@ -526,42 +524,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
         ],
       ),
     );
-  }
-
-  Widget _buildPaymentInfo() {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.payments_outlined, size: 14, color: AppColors.textMuted),
-          const SizedBox(width: 6),
-          Text(_paymentModeLabel(widget.invoice.paymentMode), style: AppTypography.bodySmall.copyWith(fontSize: 10)),
-          const Spacer(),
-          if (widget.invoice.paidAmount > 0)
-            Text('Paid: \u20B9${widget.invoice.paidAmount.toStringAsFixed(2)}', style: TextStyle(color: AppColors.success, fontSize: 10, fontWeight: FontWeight.bold)),
-          if (widget.invoice.balanceAmount > 0) ...[
-            const SizedBox(width: 8),
-            Text('Due: \u20B9${widget.invoice.balanceAmount.toStringAsFixed(2)}', style: TextStyle(color: AppColors.error, fontSize: 10, fontWeight: FontWeight.bold)),
-          ],
-        ],
-      ),
-    );
-  }
-
-  String _paymentModeLabel(String mode) {
-    switch (mode) {
-      case 'cash': return 'Cash';
-      case 'card': return 'Card';
-      case 'upi': return 'UPI';
-      case 'bank': return 'Bank Transfer';
-      case 'credit': return 'Credit';
-      default: return mode;
-    }
   }
 
   Widget _buildNotes() {

@@ -104,6 +104,7 @@ class InvoiceRepository {
     body['mode'] = 'invoice';
     body['status'] = 'draft';
     body['invoice_no'] = '';
+    body['quotation_no'] = quotation.invoiceNo;
     body['locked'] = false;
     return createInvoice(body);
   }
